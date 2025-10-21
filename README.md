@@ -1,1 +1,1 @@
-# Flare
+# Hybrid Renderer
