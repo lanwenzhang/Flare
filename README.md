@@ -19,6 +19,6 @@
   - SVGF denoising
   - ACES filmic tone mapping
 - Imgui
-  - Interactive control
+  - real-time interaction
   - GPU profiler
 
