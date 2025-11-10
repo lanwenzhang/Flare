@@ -18,7 +18,7 @@
   - Temporal anti-aliasing
   - SVGF denoising
   - ACES filmic tone mapping
-- Imgui
+- UI
   - real-time interaction
   - GPU profiler
 
