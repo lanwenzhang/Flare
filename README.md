@@ -13,7 +13,7 @@
   - Dynamic diffuse global illumination
   - Screen space reflection
 - Shadow
-  - Ray-traced shadow
+  - Ray-traced soft shadow
 - Post processing
   - Temporal anti-aliasing
   - SVGF denoising
