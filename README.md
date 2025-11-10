@@ -6,6 +6,7 @@
   - Occlusion culling
   - Indirect draw
 - Deferred shading
+- Physically based rendering
 - Indirect lighting
   - Dynamic diffuse global illumination
   - Screen space reflection
@@ -13,6 +14,7 @@
   - Ray-traced shadow
 - Post processing
   - Temporal anti-aliasing
+  - SVGF denoising
   - ACES filmic tone mapping
 - Imgui
   - Interactive control
