@@ -7,6 +7,8 @@
   - Indirect draw
 - Deferred shading
 - Physically based rendering
+  - Lambert diffuse BRDF
+  - Microfacet Cook-Torrance BRDF
 - Indirect lighting
   - Dynamic diffuse global illumination
   - Screen space reflection
