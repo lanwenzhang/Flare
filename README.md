@@ -14,11 +14,11 @@
   - Screen space reflection
 - Shadow
   - Ray-traced soft shadow
+  - SVGF denoising
 - Post processing
   - Temporal anti-aliasing
-  - SVGF denoising
   - ACES filmic tone mapping
 - UI
-  - real-time interaction
+  - real-time control
   - GPU profiler
 
