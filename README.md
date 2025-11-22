@@ -15,6 +15,8 @@
 - Shadow
   - Ray-traced soft shadow
   - SVGF denoising
+- Ambient Occlusion
+  - Ground truth ambient occlusion
 - Post processing
   - Temporal anti-aliasing
   - ACES filmic tone mapping
