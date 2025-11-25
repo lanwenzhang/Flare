@@ -14,7 +14,7 @@
   - Screen space reflection
 - Shadow
   - Ray-traced soft shadow
-  - SVGF denoising
+  - NVIDIA real-time denoisers
 - Ambient Occlusion
   - Ground truth ambient occlusion
 - Post processing
