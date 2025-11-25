@@ -21,6 +21,6 @@
   - Temporal anti-aliasing
   - ACES filmic tone mapping
 - UI
-  - real-time control
+  - real-time tweak panel
   - GPU profiler
 
