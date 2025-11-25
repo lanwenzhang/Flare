@@ -16,7 +16,7 @@
   - Ray-traced soft shadow
   - NVIDIA real-time denoisers
 - Ambient Occlusion
-  - Ground truth ambient occlusion
+  - Ground-truth ambient occlusion
 - Post processing
   - Temporal anti-aliasing
   - ACES filmic tone mapping
