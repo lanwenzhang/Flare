@@ -10,6 +10,8 @@
   - Lambert diffuse BRDF
   - Microfacet Cook-Torrance BRDF
 - Image-based lighting
+  - Diffuse IBL
+  - Specular IBL
 - Global illumination
   - Dynamic diffuse global illumination
 - Reflection
