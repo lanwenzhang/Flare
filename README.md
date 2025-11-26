@@ -9,8 +9,10 @@
 - Physically based rendering
   - Lambert diffuse BRDF
   - Microfacet Cook-Torrance BRDF
-- Indirect lighting
+- Image-based lighting
+- Global illumination
   - Dynamic diffuse global illumination
+- Reflection
   - Screen space reflection
 - Shadow
   - Ray-traced soft shadow
