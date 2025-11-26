@@ -15,6 +15,7 @@
   - BRDF lut
 - Global illumination
   - Dynamic diffuse global illumination
+  - Probe visualization
 - Reflection
   - Screen space reflection
 - Shadow
