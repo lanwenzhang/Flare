@@ -1,4 +1,8 @@
 # Hybrid Renderer
+A Vulkan sample featuring GPU culling, deferred shading, PBR, TAA, and ray-traced shadow
+
+## Examples
+![Hybrid-Renderer](docs/sponza_screenshot_01.png)
 
 ## Features
 - GPU-driven rendering
@@ -30,3 +34,7 @@
   - real-time tweak panel
   - GPU profiler
 
+## Usage
+* `W`/`A`/`S`/`D` - camera movement
+* `LMB` - hold to look around
+* `F1` - toggle UI
