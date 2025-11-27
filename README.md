@@ -1,4 +1,4 @@
-# Hybrid Renderer
+# Flare
 A Vulkan sample featuring GPU culling, deferred shading, PBR, TAA, and ray-traced shadow
 
 ## Examples
