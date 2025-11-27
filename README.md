@@ -1,5 +1,5 @@
 # Flare
-A Vulkan sample featuring GPU culling, deferred shading, PBR, TAA, and ray-traced shadow
+A real-time hybrid rendering sample featuring GPU culling, deferred shading, PBR, TAA, and ray-traced shadow
 
 ## Examples
 ![Hybrid-Renderer](docs/sponza_screenshot_01.png)
