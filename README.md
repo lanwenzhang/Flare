@@ -8,7 +8,7 @@
 - Deferred shading
 - Physically based rendering
   - Lambert diffuse BRDF
-  - Microfacet Cook-Torrance BRDF
+  - Microfacet Cook-Torrance specular BRDF
 - Image-based lighting
   - Irradiance map
   - Prefilter map
