@@ -2,7 +2,7 @@
 A real-time hybrid rendering sample featuring GPU culling, deferred shading, PBR, TAA, ray-traced shadow, and DDGI
 
 ## Examples
-![Hybrid-Renderer](docs/sponza_screenshot_01.png)
+![Flare](docs/sponza_screenshot_01.png)
 
 ## Features
 - GPU-driven rendering
