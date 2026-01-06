@@ -11,29 +11,15 @@ A real-time hybrid rendering sample featuring GPU culling, deferred shading, PBR
   - Indirect draw
 - Deferred shading
 - Physically based rendering
-  - Lambert diffuse BRDF
-  - Microfacet Cook-Torrance specular BRDF
 - Image-based lighting
-  - Irradiance map
-  - Prefilter map
-  - BRDF lut
-- Global illumination
-  - Dynamic diffuse global illumination
-  - Probe visualization
-- Reflection
-  - Screen space reflection
-- Shadow
-  - Ray-traced soft shadow
-  - SVGF denoise
-- Ambient Occlusion
-  - Ground-truth ambient occlusion
-- Anti-aliasing
-  - Temporal anti-aliasing
-- Tone mapping
-  - ACES filmic 
-- UI
-  - real-time tweak panel
-  - GPU profiler
+- Dynamic diffuse global illumination
+- Screen space reflections
+- Ray-traced soft shadow
+- Ground-truth ambient occlusion
+- Temporal anti-aliasing
+- ACES filmic Tone mapping
+- Real-time UI
+- GPU profiler
 
 ## Usage
 * `W`/`A`/`S`/`D` - camera movement
