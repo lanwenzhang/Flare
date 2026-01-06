@@ -16,6 +16,7 @@ A real-time hybrid rendering sample featuring GPU culling, deferred shading, PBR
 - Screen space reflections
 - Ray-traced soft shadow
 - Ground-truth ambient occlusion
+- Spatiotemporal Variance-Guided Filtering
 - Temporal anti-aliasing
 - ACES filmic tone mapping
 - Real-time UI
