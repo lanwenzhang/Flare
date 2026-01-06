@@ -21,6 +21,9 @@ A real-time hybrid rendering sample featuring GPU culling, deferred shading, PBR
 - Real-time UI
 - GPU profiler
 
+## To do
+- Clustered rendering
+
 ## Usage
 * `W`/`A`/`S`/`D` - camera movement
 * `LMB` - hold to look around
