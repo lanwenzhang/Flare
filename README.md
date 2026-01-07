@@ -23,6 +23,7 @@ A real-time hybrid rendering sample featuring GPU culling, deferred shading, PBR
 
 ## To do
 - Clustered rendering
+- Screen space reflections
 
 ## Usage
 * `W`/`A`/`S`/`D` - camera movement
