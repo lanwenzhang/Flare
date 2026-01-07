@@ -13,7 +13,6 @@ A real-time hybrid rendering sample featuring GPU culling, deferred shading, PBR
 - Physically based rendering
 - Image-based lighting
 - Dynamic diffuse global illumination
-- Screen space reflections
 - Ray-traced soft shadow
 - Ground-truth ambient occlusion
 - Spatiotemporal Variance-Guided Filtering
