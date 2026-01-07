@@ -9,6 +9,7 @@ A real-time hybrid rendering sample featuring GPU culling, deferred shading, PBR
   - Frustum culling
   - Occlusion culling
   - Indirect draw
+  - Variable rate shading
 - Deferred shading
 - Physically based rendering
 - Image-based lighting
