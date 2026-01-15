@@ -30,3 +30,4 @@ A real-time hybrid rendering sample featuring GPU culling, deferred shading, PBR
 * `W`/`A`/`S`/`D` - camera movement
 * `LMB` - hold to look around
 * `F1` - toggle UI
+* `F2` - toggle GPU profiler
