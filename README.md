@@ -1,5 +1,5 @@
 # Flare
-A real-time hybrid rendering sample featuring GPU culling, deferred shading, PBR, TAA, ray-traced shadow, and DDGI
+A real-time hybrid rendering sample featuring GPU culling, deferred shading, PBR, ray-traced shadow, DDGI, and TAA
 
 ## Examples
 ![Flare](docs/sponza_screenshot_01.png)
@@ -14,7 +14,6 @@ A real-time hybrid rendering sample featuring GPU culling, deferred shading, PBR
 - Image-based lighting
 - Dynamic diffuse global illumination
 - Ray-traced soft shadow
-- Ground-truth ambient occlusion
 - Spatiotemporal Variance-Guided Filtering
 - Temporal anti-aliasing
 - ACES tone mapping
@@ -22,6 +21,7 @@ A real-time hybrid rendering sample featuring GPU culling, deferred shading, PBR
 - GPU profiler
 
 ## To do
+- Ground-truth ambient occlusion
 - Clustered rendering
 - Mesh shader
 - Screen space reflections
