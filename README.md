@@ -5,6 +5,8 @@ A real-time hybrid rendering sample featuring GPU culling, deferred shading, PBR
 ![Flare](docs/sponza_screenshot_01.png)
 
 ## Features
+- Asynchronous loading
+- Multi-threaded command recording
 - GPU-driven rendering
   - Frustum culling
   - Occlusion culling
