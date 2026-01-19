@@ -5,8 +5,6 @@ A real-time hybrid rendering sample featuring GPU culling, deferred shading, PBR
 ![Flare](docs/sponza_screenshot_01.png)
 
 ## Features
-- Asynchronous loading
-- Multi-threaded command recording
 - GPU-driven rendering
   - Frustum culling
   - Occlusion culling
@@ -15,6 +13,7 @@ A real-time hybrid rendering sample featuring GPU culling, deferred shading, PBR
 - Physically based rendering
 - Image-based lighting
 - Dynamic diffuse global illumination
+- Ground-truth ambient occlusion
 - Ray-traced soft shadow
 - Spatiotemporal Variance-Guided Filtering
 - Temporal anti-aliasing
@@ -23,7 +22,8 @@ A real-time hybrid rendering sample featuring GPU culling, deferred shading, PBR
 - GPU profiler
 
 ## To do
-- Ground-truth ambient occlusion
+- Asynchronous loading
+- Multi-threaded command recording
 - Clustered rendering
 - Mesh shader
 - Screen space reflections
