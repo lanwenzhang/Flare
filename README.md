@@ -24,8 +24,8 @@ A real-time hybrid rendering sample featuring GPU culling, deferred shading, PBR
 ## To do
 - Asynchronous loading
 - Multi-threaded command recording
-- Clustered rendering
 - Mesh shader
+- Clustered rendering
 - Screen space reflections
 
 ## Usage
