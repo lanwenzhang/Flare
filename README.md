@@ -33,3 +33,10 @@ A real-time hybrid renderer featuring GPU culling, deferred shading, PBR, DDGI, 
 * `LMB` - hold to look around
 * `F1` - toggle UI
 * `F2` - toggle GPU profiler
+
+## Reference
+# Third party libaries
+
+# Open source codes
+
+# Research papers
