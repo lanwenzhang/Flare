@@ -29,6 +29,7 @@ A real-time hybrid renderer featuring GPU culling, deferred shading, PBR, DDGI, 
 ## To do
 - Asynchronous loading
 - Multi-threaded command recording
+- Visibility buffer
 - Mesh shader
 - Clustered rendering
 - Screen space reflections
