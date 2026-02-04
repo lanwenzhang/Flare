@@ -2,7 +2,7 @@
 A real-time hybrid renderer featuring GPU culling, deferred shading, PBR, DDGI, GTAO, soft shadow with SVGF, and TAA
 
 ## Examples
-![Flare](docs/sponza_screenshot_01.png)
+![Flare](docs/screenshot_01.png)
 
 ## Features
 - GPU-driven rendering
