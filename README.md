@@ -11,9 +11,9 @@ A real-time hybrid renderer featuring GPU culling, deferred shading, PBR, DDGI, 
   - Frustum culling
   - Occlusion culling
   - Indirect draw
+- Physically based rendering
 - Deferred shading
   ![Flare](docs/screenshot_02.jpg)
-- Physically based rendering
 - Image-based lighting
   ![Flare](docs/screenshot_03.jpg)
 - Dynamic diffuse global illumination
