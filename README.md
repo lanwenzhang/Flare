@@ -4,7 +4,7 @@ A real-time hybrid renderer featuring GPU culling, deferred shading, PBR, DDGI, 
 ## Examples
 ![Flare](docs/screenshot_01.png)
 
-![Flare](docs/screenshot_02.png)
+![Flare](docs/screenshot_02.jpg)
 
 ## Features
 - GPU-driven rendering
