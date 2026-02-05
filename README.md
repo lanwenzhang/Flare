@@ -14,14 +14,17 @@ A real-time hybrid renderer featuring GPU culling, deferred shading, PBR, DDGI, 
 - Physically based rendering
 - Deferred shading
   ![Flare](docs/screenshot_02.jpg)
+- Ray-traced soft shadow
+  ![Flare](docs/screenshot_06.png)
+- Spatiotemporal variance-guided filtering
+  ![Flare](docs/screenshot_07.jpg)
 - Image-based lighting
   ![Flare](docs/screenshot_03.jpg)
 - Dynamic diffuse global illumination
   ![Flare](docs/screenshot_04.jpg)
 - Ground-truth ambient occlusion
   ![Flare](docs/screenshot_05.jpg)
-- Ray-traced soft shadow
-- Spatiotemporal variance-guided filtering
+
 - Temporal anti-aliasing
 - ACES tone mapping
 - Real-time UI
