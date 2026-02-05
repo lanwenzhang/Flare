@@ -24,7 +24,6 @@ A real-time hybrid renderer featuring GPU culling, deferred shading, PBR, DDGI, 
   ![Flare](docs/screenshot_04.jpg)
 - Ground-truth ambient occlusion
   ![Flare](docs/screenshot_05.jpg)
-
 - Temporal anti-aliasing
 - ACES tone mapping
 - Real-time UI
