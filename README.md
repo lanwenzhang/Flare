@@ -26,8 +26,9 @@ A real-time hybrid renderer featuring GPU culling, deferred shading, PBR, DDGI, 
   ![Flare](docs/screenshot_05.jpg)
 - Temporal anti-aliasing
 - ACES tone mapping
-- Real-time UI
-- GPU profiler
+- Real-time UI and GPU profiler
+  ![Flare](docs/screenshot_08.jpg)
+
 
 ## To do
 - Asynchronous loading
