@@ -40,8 +40,21 @@ A real-time hybrid renderer featuring GPU culling, deferred shading, PBR, DDGI, 
 - Screen space reflections
 
 ## Prerequisites
+* Windows 11
+* [Visual Studio 2022](https://visualstudio.microsoft.com/zh-hant/downloads/) or newer
+* [Vulkan SDK 1.4](https://vulkan.lunarg.com/) or newer
+* [CMake 3.3](https://cmake.org/) or newer
+
 
 ## Building
+### Windows 
+```
+git clone --recursive https://github.com/lanwenzhang/Flare.git
+cd Flare
+mkdir build
+cd build
+cmake -G "Visual Studio 17 2022" ..
+```
 
 ## Usage
 * `W`/`A`/`S`/`D` - camera movement
