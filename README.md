@@ -40,11 +40,10 @@ A real-time hybrid renderer featuring GPU culling, deferred shading, PBR, DDGI, 
 - Screen space reflections
 
 ## Prerequisites
-* Windows 11
+* Windows 11 version 25H2
 * [Visual Studio 2022](https://visualstudio.microsoft.com/zh-hant/downloads/) or newer
 * [Vulkan SDK 1.4](https://vulkan.lunarg.com/) or newer
 * [CMake 3.3](https://cmake.org/) or newer
-
 
 ## Building
 ### Windows 
