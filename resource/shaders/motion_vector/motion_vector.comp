@@ -1,0 +1,52 @@
+#version 460
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+layout(set = 0, binding = 2) uniform taaParams{
+    mat4 inverseVP;   
+    mat4 prevVP;      
+ 	vec2 currPixelOffset;
+    vec2 prevPixelOffset;        
+    vec2 resolution;   
+};
+layout(set = 1, binding = 0) uniform sampler2D uDepth;
+layout(set = 1, binding = 1, rg16f) uniform image2D uVelocity;
+
+vec2 pixelPosToUV(ivec2 pixelPos, vec2 resolution){
+    vec2 uv = pixelPos + 0.5f;
+    return uv / resolution;
+}
+
+vec3 uvToNDC(vec2 uv, float depth){
+    return vec3( uv.x * 2.0f - 1.0f,  uv.y * 2.0f - 1.0f, depth);
+}
+
+vec3 uvToWorldPos(vec2 uv, float depth, mat4 inverseVP){
+    vec4 constructed = vec4(uvToNDC(uv, depth), 1.0f);
+    vec4 unprojected = inverseVP * constructed;
+    return unprojected.xyz / unprojected.w;
+}
+
+void main(){
+    // 1 reconstruct current world position
+    ivec3 pixelPos = ivec3(gl_GlobalInvocationID.xyz);
+    float depth = texelFetch(uDepth, pixelPos.xy, 0).r;
+    vec2 screenUV = pixelPosToUV(pixelPos.xy, resolution);
+    vec3 WorldPos = uvToWorldPos(screenUV, depth, inverseVP);
+
+    // 2 calculate prev window position
+    vec4 currNDC = vec4(uvToNDC(screenUV, depth), 1.0f);
+    vec4 prevClip = prevVP * vec4(WorldPos, 1.0f);
+    if (prevClip.w <= 0.0f) {
+        imageStore(uVelocity, pixelPos.xy, vec4(0.0));
+        return;
+    }
+    vec3 prevNDC = prevClip.xyz / prevClip.w;
+    vec2 prevWindowPos;
+    prevWindowPos.x = (prevNDC.x * 0.5 + 0.5) * resolution.x;
+    prevWindowPos.y = (prevNDC.y * 0.5 + 0.5) * resolution.y;
+    vec2 currWindowPos = vec2(pixelPos.xy) + vec2(0.5);
+
+    // 3 motion vector
+    vec2 velocity = prevWindowPos - currWindowPos + (currPixelOffset - prevPixelOffset);
+    imageStore(uVelocity, pixelPos.xy, vec4(velocity, 0, 0));
+}

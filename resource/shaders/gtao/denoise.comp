@@ -1,0 +1,192 @@
+#version 450
+
+layout(set = 0, binding = 6) uniform GTAOParams {
+    vec2  resolution;     
+    vec2  depthUnpack; 
+    vec2  ndcToViewMul;            
+    vec2  ndcToViewAdd;     
+    vec2  ndcToViewMul_x_PixelSize;
+
+    float effectRadius;
+    float effectFalloffRange;
+    float radiusMultiplier;
+    float sampleDistributionPower;
+
+    float thinOccluderCompensation;
+    float depthMipSamplingOffset;  
+    float finalValuePower;   
+    float denoiseBlurBeta;
+
+    uint  frameIndex;
+    uint  sliceCount;       
+    uint  stepsPerSlice;
+    uint  depthMipLevels;
+
+    mat4 worldToView;
+};
+
+layout(set = 1, binding = 0) uniform usampler2D uAOSource;
+layout(set = 1, binding = 1) uniform sampler2D uEdges;
+layout(set = 1, binding = 2, r8ui) uniform uimage2D uAOOut;
+
+layout(push_constant) uniform DenoisePush {
+    uint  finalApply;    
+} pc;
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+
+float saturateFloat(float v) { return clamp(v, 0.0, 1.0); }
+vec4  saturateVec4(vec4 v)   { return clamp(v, vec4(0.0), vec4(1.0)); }
+
+vec4 unpackEdges(float packedVal01){
+    uint packedVal = uint(packedVal01 * 255.5);
+    vec4 edgesLRTB;
+    edgesLRTB.x = float((packedVal >> 6) & 0x03u) / 3.0; // L
+    edgesLRTB.y = float((packedVal >> 4) & 0x03u) / 3.0; // R
+    edgesLRTB.z = float((packedVal >> 2) & 0x03u) / 3.0; // T
+    edgesLRTB.w = float((packedVal >> 0) & 0x03u) / 3.0; // B
+    return saturateVec4(edgesLRTB);
+}
+
+void addSample(float ssaoValue, float edgeValue, inout float sum, inout float sumWeight){
+    float weight = edgeValue;
+    sum += weight * ssaoValue;
+    sumWeight += weight;
+}
+
+float decodeAo(uint packed255){
+    return float(packed255) / 255.0;
+}
+
+uint encodeAo(float ao01){
+    ao01 = saturateFloat(ao01);
+    return uint(ao01 * 255.0 + 0.5);
+}
+
+ivec2 clampCoord(ivec2 c){
+    return clamp(c, ivec2(0,0), ivec2(int(resolution.x)-1, int(resolution.y)-1));
+}
+
+vec4 gatherEdges(vec2 uv, ivec2 offsetTexels){
+    ivec2 base = ivec2(uv * resolution) + offsetTexels;
+
+    ivec2 c00 = clampCoord(base + ivec2(0,0));
+    ivec2 c10 = clampCoord(base + ivec2(1,0));
+    ivec2 c01 = clampCoord(base + ivec2(0,1));
+    ivec2 c11 = clampCoord(base + ivec2(1,1));
+
+    float e00 = texelFetch(uEdges, c00, 0).r;
+    float e10 = texelFetch(uEdges, c10, 0).r;
+    float e01 = texelFetch(uEdges, c01, 0).r;
+    float e11 = texelFetch(uEdges, c11, 0).r;
+    return vec4(e00, e10, e01, e11);
+}
+
+uvec4 gatherAo(vec2 uv, ivec2 offsetTexels){
+    ivec2 base = ivec2(uv * resolution) + offsetTexels;
+
+    ivec2 c00 = clampCoord(base + ivec2(0,0));
+    ivec2 c10 = clampCoord(base + ivec2(1,0));
+    ivec2 c01 = clampCoord(base + ivec2(0,1));
+    ivec2 c11 = clampCoord(base + ivec2(1,1));
+
+    uint a00 = texelFetch(uAOSource, c00, 0).r;
+    uint a10 = texelFetch(uAOSource, c10, 0).r;
+    uint a01 = texelFetch(uAOSource, c01, 0).r;
+    uint a11 = texelFetch(uAOSource, c11, 0).r;
+    return uvec4(a00, a10, a01, a11);
+}
+
+void gtaoDenoise(ivec2 pixCoordBase){
+    float blurAmount = pc.finalApply == 1u ? denoiseBlurBeta : denoiseBlurBeta / 5.0 ;
+    const float diagWeight = 0.85 * 0.5;
+
+    // gather edge & ao quads
+    vec2 pixelSize = 1.0 / resolution;
+    vec2 gatherCenter = vec2(pixCoordBase) * pixelSize;
+
+    vec4 edgesQ0 = gatherEdges(gatherCenter, ivec2(0, 0));
+    vec4 edgesQ1 = gatherEdges(gatherCenter, ivec2(2, 0));
+    vec4 edgesQ2 = gatherEdges(gatherCenter, ivec2(1, 2));
+
+    uvec4 aoQ0u = gatherAo(gatherCenter, ivec2(0, 0));
+    uvec4 aoQ1u = gatherAo(gatherCenter, ivec2(2, 0));
+    uvec4 aoQ2u = gatherAo(gatherCenter, ivec2(0, 2));
+    uvec4 aoQ3u = gatherAo(gatherCenter, ivec2(2, 2));
+
+    float visQ0[4]; float visQ1[4]; float visQ2[4]; float visQ3[4];
+    
+    // match XeGTAO_DecodeGatherPartial loop order
+    visQ0[0] = decodeAo(aoQ0u.x); visQ0[1] = decodeAo(aoQ0u.y); visQ0[2] = decodeAo(aoQ0u.z); visQ0[3] = decodeAo(aoQ0u.w);
+    visQ1[0] = decodeAo(aoQ1u.x); visQ1[1] = decodeAo(aoQ1u.y); visQ1[2] = decodeAo(aoQ1u.z); visQ1[3] = decodeAo(aoQ1u.w);
+    visQ2[0] = decodeAo(aoQ2u.x); visQ2[1] = decodeAo(aoQ2u.y); visQ2[2] = decodeAo(aoQ2u.z); visQ2[3] = decodeAo(aoQ2u.w);
+    visQ3[0] = decodeAo(aoQ3u.x); visQ3[1] = decodeAo(aoQ3u.y); visQ3[2] = decodeAo(aoQ3u.z); visQ3[3] = decodeAo(aoQ3u.w);
+
+    // process 2 pixels: pixCoordBase and pixCoordBase + (1,0)
+    for (int side = 0; side < 2; ++side){
+        ivec2 pixCoord = pixCoordBase + ivec2(side, 0);
+        // bounds
+        if (pixCoord.x < 0 || pixCoord.y < 0 ||
+            pixCoord.x >= int(resolution.x) || pixCoord.y >= int(resolution.y))
+            continue;
+        // Unpack edges for neighbours
+        vec4 edgesL = unpackEdges((side == 0) ? edgesQ0.x : edgesQ0.y);
+        vec4 edgesT = unpackEdges((side == 0) ? edgesQ0.z : edgesQ1.w);
+        vec4 edgesR = unpackEdges((side == 0) ? edgesQ1.x : edgesQ1.y);
+        vec4 edgesB = unpackEdges((side == 0) ? edgesQ2.w : edgesQ2.z);
+        vec4 edgesC = unpackEdges((side == 0) ? edgesQ0.y : edgesQ1.x);
+
+        // enforce symmetricity
+        edgesC *= vec4(edgesL.y, edgesR.x, edgesT.w, edgesB.z);
+
+        // leak tweak
+        const float leakThreshold = 2.5;
+        const float leakStrength  = 0.5;
+        float edginess = (saturateFloat(4.0 - leakThreshold - dot(edgesC, vec4(1.0))) / (4.0 - leakThreshold)) * leakStrength;
+        edgesC = saturateVec4(edgesC + vec4(edginess));
+
+        // diagonal weights
+        float weightTL = diagWeight * (edgesC.x * edgesL.z + edgesC.z * edgesT.x);
+        float weightTR = diagWeight * (edgesC.z * edgesT.y + edgesC.y * edgesR.z);
+        float weightBL = diagWeight * (edgesC.w * edgesB.x + edgesC.x * edgesL.w);
+        float weightBR = diagWeight * (edgesC.y * edgesR.w + edgesC.w * edgesB.y);
+
+        // pick neighborhood ao values (same indexing as XeGTAO)
+        float ssaoValue   = (side == 0) ? visQ0[1] : visQ1[0];
+        float ssaoValueL  = (side == 0) ? visQ0[0] : visQ0[1];
+        float ssaoValueT  = (side == 0) ? visQ0[2] : visQ1[3];
+        float ssaoValueR  = (side == 0) ? visQ1[0] : visQ1[1];
+        float ssaoValueB  = (side == 0) ? visQ2[2] : visQ3[3];
+        float ssaoValueTL = (side == 0) ? visQ0[3] : visQ0[2];
+        float ssaoValueBR = (side == 0) ? visQ3[3] : visQ3[2];
+        float ssaoValueTR = (side == 0) ? visQ1[3] : visQ1[2];
+        float ssaoValueBL = (side == 0) ? visQ2[3] : visQ2[2];
+
+        // weighted sum
+        float sumWeight = blurAmount;
+        float sum       = ssaoValue * sumWeight;
+
+        addSample(ssaoValueL,  edgesC.x, sum, sumWeight);
+        addSample(ssaoValueR,  edgesC.y, sum, sumWeight);
+        addSample(ssaoValueT,  edgesC.z, sum, sumWeight);
+        addSample(ssaoValueB,  edgesC.w, sum, sumWeight);
+
+        addSample(ssaoValueTL, weightTL, sum, sumWeight);
+        addSample(ssaoValueTR, weightTR, sum, sumWeight);
+        addSample(ssaoValueBL, weightBL, sum, sumWeight);
+        addSample(ssaoValueBR, weightBR, sum, sumWeight);
+
+        float aoOut = sum / max(sumWeight, 1e-6);
+        imageStore(uAOOut, pixCoord, uvec4(encodeAo(aoOut), 0u, 0u, 0u));
+    }
+}
+
+void main(){
+    ivec2 globalId = ivec2(gl_GlobalInvocationID.xy);
+    ivec2 pixCoordBase = ivec2(globalId.x * 2, globalId.y);
+    if (pixCoordBase.y >= int(resolution.y) || pixCoordBase.x >= int(resolution.x))
+        return;
+    gtaoDenoise(pixCoordBase);
+}
+  

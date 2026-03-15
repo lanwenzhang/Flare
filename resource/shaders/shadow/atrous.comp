@@ -1,0 +1,120 @@
+#version 460
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+layout(set = 0, binding = 2) uniform taaParams{
+    mat4 inverseVP;   
+    mat4 prevVP;      
+ 	vec2 currPixelOffset;
+    vec2 prevPixelOffset;        
+    vec2 resolution;   
+};
+
+layout(set = 2, binding = 0) uniform sampler2D uNormal;
+layout(set = 2, binding = 1) uniform sampler2D uDepth;
+layout(set = 2, binding = 2) uniform sampler2D uInput;
+layout(set = 2, binding = 3, rg16f) writeonly uniform image2D uOutput;
+
+layout(push_constant) uniform PushConstants{
+    int radius;
+    int stepSize;
+    float phiVisibility;
+    float phiNormal;
+    float sigmaDepth;
+    float power;
+} pc;
+
+float computeEdgeStoppingWeight(float centerDepth, float sampleDepth, float sigmaDepth,
+                                vec3  centerNormal, vec3  sampleNormal,float phiNormal,
+                                float centerLuma,float sampleLuma, float phiVisibility){
+    // depth weight
+    float wDepth = exp(-abs(centerDepth - sampleDepth) / sigmaDepth);
+
+    // normal weight
+    float wNormal = pow(clamp(dot(centerNormal, sampleNormal), 0.0f, 1.0f), phiNormal);
+
+    // visibility weight
+    float wLuma = abs(centerLuma - sampleLuma) / phiVisibility;
+
+    return exp(0.0 - max(wLuma, 0.0) - max(wDepth, 0.0)) * wNormal;
+}
+
+
+float computeVariance(ivec2 pixel){
+    float sum = 0.0f;
+    const float kernel[2][2] = {
+        { 1.0 / 4.0, 1.0 / 8.0 },
+        { 1.0 / 8.0, 1.0 / 16.0 }
+    };
+    const int radius = 1;
+    for(int y = - radius; y <= radius; y++){
+        for(int x = -radius; x <= radius; x++){
+            ivec2 p = pixel + ivec2(x, y);
+            ivec2 size = textureSize(uInput, 0);
+            p = clamp(p, ivec2(0, 0), size - ivec2(1));
+            float k = kernel[abs(x)][abs(y)];
+            sum += texelFetch(uInput, p, 0).g * k;
+        }
+    }
+    return sum;
+}
+
+void main(){
+    ivec2 size  = textureSize(uDepth, 0);
+    ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
+    const float epsVariance = 1e-10;
+    const float kernelWeights[3] = { 1.0, 2.0 / 3.0, 1.0 / 6.0};
+
+    vec2  centerVisVar   = texelFetch(uInput, pixel, 0).rg;
+    float centerVis      = centerVisVar.x;
+    float centerVariance = centerVisVar.y;
+
+    float centerDepth = texelFetch(uDepth, pixel, 0).r;
+    if (centerDepth >= 1.0){
+        imageStore(uOutput, pixel, vec4(centerVisVar, 0.0, 0.0));
+        return;
+    }
+    vec3 centerNormal = normalize(texelFetch(uNormal, pixel, 0).xyz);
+    float var = computeVariance(pixel);
+    float phiVisibility = pc.phiVisibility * sqrt(max(0.0, epsVariance + var));
+
+
+    float sumW      = 1.0;
+    vec2  sumVisVar = centerVisVar;
+    for (int y = -pc.radius; y <= pc.radius; y++){
+        for (int x = -pc.radius; x <= pc.radius; x++){
+            ivec2 offset = ivec2(x, y);
+            if (offset.x == 0 && offset.y == 0)
+                continue;
+
+            ivec2 p = pixel + offset * pc.stepSize;
+            bool inside = all(greaterThanEqual(p, ivec2(0, 0))) && all(lessThan(p, size));
+            if (!inside)
+                continue;
+
+            int ix = clamp(abs(x), 0, 2);
+            int iy = clamp(abs(y), 0, 2);
+            float k = kernelWeights[ix] * kernelWeights[iy];
+
+            vec2 sampleVisVar = texelFetch(uInput, p, 0).rg;
+            float sampleVis   = sampleVisVar.x;
+
+            float sampleDepth  = texelFetch(uDepth, p, 0).r;
+            vec3  sampleNormal = normalize(texelFetch(uNormal, p, 0).xyz);
+
+            float w = computeEdgeStoppingWeight(centerDepth, sampleDepth, pc.sigmaDepth,
+                                                centerNormal, sampleNormal, pc.phiNormal,
+                                                centerVis, sampleVis, phiVisibility);
+            float wVis = w * k;
+
+            sumW      += wVis;
+            sumVisVar += vec2(wVis, wVis * wVis) * sampleVisVar;
+        }
+    }
+
+    vec2 outVisVar = sumVisVar / vec2(sumW, sumW * sumW);
+    if (pc.power != 0.0){
+        outVisVar.x = pow(outVisVar.x, pc.power);
+    }
+    outVisVar.x = clamp(outVisVar.x, 0.0, 1.0);
+    imageStore(uOutput, pixel, vec4(outVisVar, 0.0, 0.0));
+}

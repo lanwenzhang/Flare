@@ -1,0 +1,135 @@
+#version 460
+layout(local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
+
+layout(set = 0, binding = 0) uniform DDGIParams{ 
+    vec4  probeGridPosition;
+    vec4  probeSpacing; 
+    vec4  reciprocalProbeSpacing;
+    ivec4 probeCounts;
+
+    int   irradianceWidth;
+    int   irradianceHeight;
+    int   irradianceSideLength;
+    int   probeRays;
+
+    float selfShadowBias;
+    float hysteresis;
+    float infiniteBounceMultiplier;
+    float maxOffset;
+
+    uint enableInfiniteBounce;
+    uint enableBackfaceBlending;
+    uint enableSmoothBackface;
+    uint enableProbeOffset;
+
+    mat4  randomRotation;
+};
+
+layout(set = 1, binding = 0) uniform sampler2D uRadiance;
+layout(set = 1, binding = 1, rgba16f) uniform image2D uOffsetOut;
+layout(set = 1, binding = 2, rgba16f) uniform image2D uOffsetIn;
+
+layout(push_constant) uniform PushConstants {
+    uint   firstFrame;
+} pc;
+
+#define PI 3.1415926538
+
+vec3 sphericalFibonacci(float i, float n){
+    const float PHI = 0.5 * (sqrt(5.0) + 1.0);
+    float phi       = 2.0 * PI * fract(i * (PHI - 1.0));
+    float cosTheta = 1.0 - (2.0 * i + 1.0) / n;
+    float sinTheta = sqrt(max(0.0, 1.0 - cosTheta * cosTheta));
+    return vec3(cos(phi) * sinTheta, sin(phi) * sinTheta, cosTheta);
+}
+
+void main(){
+    ivec3 coords = ivec3(gl_GlobalInvocationID.xyz);
+    int probeIndex = coords.x;
+    int totalProbes = probeCounts.x * probeCounts.y * probeCounts.z;
+    if (probeIndex >= totalProbes) {
+        return;
+    }
+
+    int closestBackfaceIndex = -1;
+    float closestBackfaceDistance = 100000000.0f;
+    int closestFrontfaceIndex = -1;
+    float closestFrontfaceDistance = 100000000.0f;
+    int farthestFrontfaceIndex = -1;
+    float farthestFrontfaceDistance = 0.0f;
+    int backfacesCount = 0;
+
+    for (int rayIndex = 0; rayIndex < probeRays; ++rayIndex) {
+        ivec2 rayTexCoord = ivec2(rayIndex, probeIndex);
+        float rayDistance = texelFetch(uRadiance, rayTexCoord, 0).w;
+
+        if (rayDistance <= 0.0f) {
+            ++backfacesCount;
+            if ((-rayDistance) < closestBackfaceDistance) {
+                closestBackfaceDistance = -rayDistance;
+                closestBackfaceIndex = rayIndex;
+            }
+        } else {
+            if (rayDistance < closestFrontfaceDistance) {
+                closestFrontfaceDistance = rayDistance;
+                closestFrontfaceIndex = rayIndex;
+            } else if (rayDistance > farthestFrontfaceDistance) {
+                farthestFrontfaceDistance = rayDistance;
+                farthestFrontfaceIndex = rayIndex;
+            }
+        }
+    }
+
+    vec3 fullOffset = vec3(10000.0f);
+    vec3 cellOffsetLimit = maxOffset * probeSpacing.xyz;
+    vec4 currentOffset = vec4(0.0f);
+
+     if (pc.firstFrame == 0) {
+        int probeCountsXY = probeCounts.x * probeCounts.y;
+        ivec2 probeOffsetSamplingCoordinates = ivec2(probeIndex % probeCountsXY, probeIndex / probeCountsXY);
+        currentOffset.rgb = imageLoad(uOffsetIn, probeOffsetSamplingCoordinates).rgb;
+    }
+    bool insideGeometry = (float(backfacesCount) / float(probeRays)) > 0.25f;
+
+    if (insideGeometry && (closestBackfaceIndex != -1)) {
+
+        vec3 closestBackfaceDirection = closestBackfaceDistance * normalize(mat3(randomRotation) * sphericalFibonacci(closestBackfaceIndex, probeRays));
+
+        // Find the maximum offset inside the cell.
+        vec3 positiveOffset = (currentOffset.xyz + cellOffsetLimit) / closestBackfaceDirection;
+        vec3 negativeOffset = (currentOffset.xyz - cellOffsetLimit) / closestBackfaceDirection;
+        vec3 maximumOffset = vec3(
+            max(positiveOffset.x, negativeOffset.x),
+            max(positiveOffset.y, negativeOffset.y),
+            max(positiveOffset.z, negativeOffset.z)
+        );
+
+        // Get the smallest of the offsets to scale the direction
+        float directionScaleFactor = min(min(maximumOffset.x, maximumOffset.y), maximumOffset.z) - 0.001f;
+
+        // Move the offset in the opposite direction of the backface one.
+        fullOffset = currentOffset.xyz - closestBackfaceDirection * directionScaleFactor;
+    }
+    else if (closestFrontfaceDistance < 0.05f) {
+
+        // In this case we have a very small hit distance.
+        // Ensure that we never move through the farthest frontface
+        // Move minimum distance to ensure not moving on a future iteration.
+        vec3 farthestDirection = min(0.2f, farthestFrontfaceDistance) * normalize(mat3(randomRotation) 
+                                 * sphericalFibonacci(farthestFrontfaceIndex, probeRays));
+
+        vec3 closestDirection = normalize(mat3(randomRotation) * sphericalFibonacci(closestFrontfaceIndex, probeRays));
+        if (dot(farthestDirection, closestDirection) < 0.5f) {
+            fullOffset = currentOffset.xyz + farthestDirection;
+        }
+    }
+    if (all(lessThan(abs(fullOffset), cellOffsetLimit))) {
+        currentOffset.xyz = fullOffset;
+    }
+    int probeCountsXY = probeCounts.x * probeCounts.y;
+
+    int probeTexelX = (probeIndex % probeCountsXY);
+    int probeTexelY = probeIndex / probeCountsXY;
+
+    imageStore(uOffsetOut, ivec2(probeTexelX, probeTexelY), currentOffset);
+}

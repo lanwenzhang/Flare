@@ -1,0 +1,143 @@
+#version 450
+layout(set = 0, binding = 0) uniform sampler2D uGDepth;
+layout(set = 0, binding = 1, r16f) uniform image2D uDepthMip0;
+layout(set = 0, binding = 2, r16f) uniform image2D uDepthMip1;
+layout(set = 0, binding = 3, r16f) uniform image2D uDepthMip2;
+layout(set = 0, binding = 4, r16f) uniform image2D uDepthMip3;
+layout(set = 0, binding = 5, r16f) uniform image2D uDepthMip4;
+
+layout(set = 0, binding = 6) uniform GTAOParams {
+    vec2  resolution;     
+    vec2  depthUnpack; 
+    vec2  ndcToViewMul;            
+    vec2  ndcToViewAdd;     
+    vec2  ndcToViewMul_x_PixelSize;
+
+    float effectRadius;
+    float effectFalloffRange;
+    float radiusMultiplier;
+    float sampleDistributionPower;
+
+    float thinOccluderCompensation;
+    float depthMipSamplingOffset;  
+    float finalValuePower;   
+    float denoiseBlurBeta;
+
+    uint  frameIndex;
+    uint  sliceCount;       
+    uint  stepsPerSlice;
+    uint  depthMipLevels;
+
+    mat4 worldToView;
+};
+
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+shared float scratchDepths[8][8];
+
+vec2 viewportPixelSize() {
+    return 1.0 / resolution;
+}
+
+float screenSpaceToViewSpaceDepth(float screenDepth) {
+    return depthUnpack.x / (depthUnpack.y - screenDepth);
+}
+
+float clampDepth(float depthValue) {
+    return clamp(depthValue, 0.0, 65504.0);
+}
+
+
+float depthMipFilter(float depth0, float depth1, float depth2, float depth3) {
+    float maxDepth = max(max(depth0, depth1), max(depth2, depth3));
+    const float depthRangeScaleFactor = 0.75;
+
+    float radiusVs  = depthRangeScaleFactor * effectRadius * radiusMultiplier;
+    float falloffRange = effectFalloffRange * radiusVs;
+    float falloffFrom  = radiusVs * (1.0 - effectFalloffRange);
+
+    float falloffMul = -1.0 / falloffRange;
+    float falloffAdd = falloffFrom / falloffRange + 1.0;
+
+    float weight0 = clamp((maxDepth - depth0) * falloffMul + falloffAdd, 0.0, 1.0);
+    float weight1 = clamp((maxDepth - depth1) * falloffMul + falloffAdd, 0.0, 1.0);
+    float weight2 = clamp((maxDepth - depth2) * falloffMul + falloffAdd, 0.0, 1.0);
+    float weight3 = clamp((maxDepth - depth3) * falloffMul + falloffAdd, 0.0, 1.0);
+
+    float weightSum = weight0 + weight1 + weight2 + weight3;
+    return (weight0 * depth0 + weight1 * depth1 + weight2 * depth2 + weight3 * depth3) / weightSum;
+}
+
+float fetchNdcDepthClamped(ivec2 pixelCoord) {
+    ivec2 size0 = textureSize(uGDepth, 0);
+    ivec2 c = clamp(pixelCoord, ivec2(0, 0), size0 - ivec2(1, 1));
+    return texelFetch(uGDepth, c, 0).r;
+}
+
+void main(){
+    uvec2 dispatchThreadId = gl_GlobalInvocationID.xy;
+    uvec2 groupThreadId    = gl_LocalInvocationID.xy;
+
+    uvec2 baseCoord = dispatchThreadId;   
+    uvec2 pixCoordU = baseCoord * 2u; 
+    ivec2 pixCoord = ivec2(pixCoordU);
+
+    // mip 0
+    float ndc00 = fetchNdcDepthClamped(pixCoord + ivec2(0, 0));
+    float ndc10 = fetchNdcDepthClamped(pixCoord + ivec2(1, 0));
+    float ndc01 = fetchNdcDepthClamped(pixCoord + ivec2(0, 1));
+    float ndc11 = fetchNdcDepthClamped(pixCoord + ivec2(1, 1));
+
+    float depth00 = clampDepth(screenSpaceToViewSpaceDepth(ndc00));
+    float depth10 = clampDepth(screenSpaceToViewSpaceDepth(ndc10));
+    float depth01 = clampDepth(screenSpaceToViewSpaceDepth(ndc01));
+    float depth11 = clampDepth(screenSpaceToViewSpaceDepth(ndc11));
+
+    imageStore(uDepthMip0,  pixCoord + ivec2(0, 0), vec4(depth00, 0.0, 0.0, 0.0));
+    imageStore(uDepthMip0,  pixCoord + ivec2(1, 0), vec4(depth10, 0.0, 0.0, 0.0));
+    imageStore(uDepthMip0,  pixCoord + ivec2(0, 1), vec4(depth01, 0.0, 0.0, 0.0));
+    imageStore(uDepthMip0,  pixCoord + ivec2(1, 1), vec4(depth11, 0.0, 0.0, 0.0));
+
+    // mip 1
+    float dm1 = depthMipFilter(depth00, depth10, depth01, depth11);
+    imageStore(uDepthMip1, ivec2(baseCoord), vec4(dm1, 0.0, 0.0, 0.0));
+    scratchDepths[groupThreadId.x][groupThreadId.y] = dm1;
+    barrier();
+
+    // mip 2
+    if (((groupThreadId.x & 1u) == 0u) && ((groupThreadId.y & 1u) == 0u)) {
+        float inTl = scratchDepths[groupThreadId.x + 0u][groupThreadId.y + 0u];
+        float inTr = scratchDepths[groupThreadId.x + 1u][groupThreadId.y + 0u];
+        float inBl = scratchDepths[groupThreadId.x + 0u][groupThreadId.y + 1u];
+        float inBr = scratchDepths[groupThreadId.x + 1u][groupThreadId.y + 1u];
+
+        float dm2 = depthMipFilter(inTl, inTr, inBl, inBr);
+        imageStore(uDepthMip2, ivec2(baseCoord / 2u), vec4(dm2, 0.0, 0.0, 0.0));
+        scratchDepths[groupThreadId.x][groupThreadId.y] = dm2;
+    }
+    barrier();
+
+    // mip 3
+    if (((groupThreadId.x & 3u) == 0u) && ((groupThreadId.y & 3u) == 0u)) {
+        float inTl = scratchDepths[groupThreadId.x + 0u][groupThreadId.y + 0u];
+        float inTr = scratchDepths[groupThreadId.x + 2u][groupThreadId.y + 0u];
+        float inBl = scratchDepths[groupThreadId.x + 0u][groupThreadId.y + 2u];
+        float inBr = scratchDepths[groupThreadId.x + 2u][groupThreadId.y + 2u];
+
+        float dm3 = depthMipFilter(inTl, inTr, inBl, inBr);
+        imageStore(uDepthMip3, ivec2(baseCoord / 4u), vec4(dm3, 0.0, 0.0, 0.0));
+        scratchDepths[groupThreadId.x][groupThreadId.y] = dm3;
+    }
+    barrier();
+
+    // mip 4
+    if (((groupThreadId.x & 7u) == 0u) && ((groupThreadId.y & 7u) == 0u)) {
+        float inTl = scratchDepths[groupThreadId.x + 0u][groupThreadId.y + 0u];
+        float inTr = scratchDepths[groupThreadId.x + 4u][groupThreadId.y + 0u];
+        float inBl = scratchDepths[groupThreadId.x + 0u][groupThreadId.y + 4u];
+        float inBr = scratchDepths[groupThreadId.x + 4u][groupThreadId.y + 4u];
+
+        float dm4 = depthMipFilter(inTl, inTr, inBl, inBr);
+        imageStore(uDepthMip4, ivec2(baseCoord / 8u), vec4(dm4, 0.0, 0.0, 0.0));
+    }
+}

@@ -1,0 +1,253 @@
+{
+  "nodes": [
+    {
+      "name": "depth_pre_pass",
+      "inputs": [
+        {
+          "resource": "no_inputs",
+          "access": "Reference"
+        }
+      ],
+      "outputs": [
+        {
+          "resource": "depth_linear",
+          "access": "Attachment",
+          "format": "VK_FORMAT_R32_SFLOAT",
+          "resolution": [ 1200, 800 ],
+          "op": "VK_ATTACHMENT_LOAD_OP_CLEAR"
+        },
+        {
+          "resource": "depth",
+          "access": "Attachment",
+          "format": "VK_FORMAT_D32_SFLOAT",
+          "resolution": [ 1200, 800 ],
+          "op": "VK_ATTACHMENT_LOAD_OP_CLEAR"
+        }
+      ]
+    },
+    {
+      "name": "depth_pyramid_pass",
+      "inputs": [
+        {
+          "resource": "linear_depth",
+          "access": "Texture"
+        }
+      ],
+      "outputs": [
+        {
+          "resource": "hzb",
+          "access": "Attachment",
+          "format": "VK_FORMAT_R32_SFLOAT",
+          "resolution": [ 1200, 800 ],
+          "op": "VK_ATTACHMENT_LOAD_OP_CLEAR"
+        }
+      ]
+    },
+    {
+      "name": "culling_pass",
+      "inputs": [
+        {
+          "resource": "hzb",
+          "access": "Texture"
+        }
+      ],
+      "outputs": [
+        {
+          "resource": "indirect_args",
+          "access": "Buffer"
+        }
+      ]
+    },
+    {
+      "name": "gbuffer_pass",
+      "inputs": [
+        {
+          "resource": "indirect_args",
+          "access": "Buffer"
+        }
+      ],
+      "outputs": [
+        {
+          "resource": "gbuffer_color",
+          "access": "Attachment",
+          "format": "VK_FORMAT_R16G16B16A16_SFLOAT",
+          "resolution": [ 1200, 800 ],
+          "op": "VK_ATTACHMENT_LOAD_OP_CLEAR"
+        },
+        {
+          "resource": "gbuffer_normal",
+          "access": "Attachment",
+          "format": "VK_FORMAT_R16G16B16A16_SFLOAT",
+          "resolution": [ 1200, 800 ],
+          "op": "VK_ATTACHMENT_LOAD_OP_CLEAR"
+        },
+        {
+          "resource": "gbuffer_metallic_roughness",
+          "access": "Attachment",
+          "format": "VK_FORMAT_R8G8B8A8_UNORM",
+          "resolution": [ 1200, 800 ],
+          "op": "VK_ATTACHMENT_LOAD_OP_CLEAR"
+        },
+        {
+          "resource": "gbuffer_depth",
+          "access": "Attachment",
+          "format": "VK_FORMAT_D32_SFLOAT",
+          "resolution": [ 1200, 800 ],
+          "op": "VK_ATTACHMENT_LOAD_OP_CLEAR"
+        }
+      ]
+    },
+    {
+      "name": "motion_vector_pass",
+      "inputs": [
+        {
+          "resource": "gbuffer_depth",
+          "access": "Texture"
+        }
+      ],
+      "outputs": [
+        {
+          "resource": "motion_vectors",
+          "access": "Attachment",
+          "format": "VK_FORMAT_R16G16_SFLOAT",
+          "resolution": [ 1200, 800 ],
+          "op": "VK_ATTACHMENT_LOAD_OP_CLEAR"
+        }
+      ]
+    },
+    {
+      "name": "ray_traced_shadow_pass",
+      "inputs": [
+        {
+          "resource": "gbuffer_depth",
+          "access": "Texture"
+        },
+        {
+          "resource": "gbuffer_normal",
+          "access": "Texture"
+        },
+        {
+          "resource": "motion_vectors",
+          "access": "Texture"
+        }
+      ],
+      "outputs": [
+        {
+          "resource": "visibility",
+          "access": "Attachment",
+          "format": "VK_FORMAT_R16G16_SFLOAT",
+          "resolution": [ 1200, 800 ],
+          "op": "VK_ATTACHMENT_LOAD_OP_CLEAR"
+        }
+      ]
+    },
+    {
+      "name": "ddgi_pass",
+      "inputs": [
+        {
+          "resource": "gbuffer_depth",
+          "access": "Texture"
+        },
+        {
+          "resource": "gbuffer_normal",
+          "access": "Texture"
+        }
+      ],
+      "outputs": [
+        {
+          "resource": "indirect_lighting",
+          "access": "Attachment",
+          "format": "VK_FORMAT_R16G16B16A16_SFLOAT",
+          "resolution": [ 1200, 800 ],
+          "op": "VK_ATTACHMENT_LOAD_OP_CLEAR"
+        }
+      ]
+    },
+    {
+      "name": "gtao_pass",
+      "inputs": [
+        {
+          "resource": "gbuffer_depth",
+          "access": "Texture"
+        },
+        {
+          "resource": "gbuffer_normal",
+          "access": "Texture"
+        }
+      ],
+      "outputs": [
+        {
+          "resource": "ao",
+          "access": "Attachment",
+          "format": "VK_FORMAT_R8_UNORM",
+          "resolution": [ 1200, 800 ],
+          "op": "VK_ATTACHMENT_LOAD_OP_CLEAR"
+        }
+      ]
+    },
+    {
+      "name": "lighting_pass",
+      "inputs": [
+        {
+          "resource": "gbuffer_color",
+          "access": "Texture"
+        },
+        {
+          "resource": "gbuffer_normal",
+          "access": "Texture"
+        },
+        {
+          "resource": "gbuffer_metallic_roughness",
+          "access": "Texture"
+        },
+        {
+          "resource": "visibility",
+          "access": "Texture"
+        },
+        {
+          "resource": "indirect_lighting",
+          "access": "Texture"
+        },
+        {
+          "resource": "ao",
+          "access": "Texture"
+        }
+      ],
+      "outputs": [
+        {
+          "resource": "lighting",
+          "access": "Attachment",
+          "format": "VK_FORMAT_R16G16B16A16_SFLOAT",
+          "resolution": [ 1200, 800 ],
+          "op": "VK_ATTACHMENT_LOAD_OP_CLEAR"
+        }
+      ]
+    },
+    {
+      "name": "taa_pass",
+      "inputs": [
+        {
+          "resource": "gbuffer_depth",
+          "access": "Texture"
+        },
+        {
+          "resource": "motion_vectors",
+          "access": "Texture"
+        },
+        {
+          "resource": "lighting",
+          "access": "Texture"
+        }
+      ],
+      "outputs": [
+        {
+          "resource": "taa_output",
+          "access": "Attachment",
+          "format": "VK_FORMAT_R16G16B16A16_SFLOAT",
+          "resolution": [ 1200, 800 ],
+          "op": "VK_ATTACHMENT_LOAD_OP_CLEAR"
+        }
+      ]
+    }
+  ]
+}

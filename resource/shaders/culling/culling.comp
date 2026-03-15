@@ -1,0 +1,118 @@
+#version 450
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+
+layout(set = 0, binding = 0) buffer DrawCommands { uint dc[];};
+layout(set = 0, binding = 1) buffer CullingData {
+    vec4 planes[6];
+
+    uint numMeshesToCull;
+    uint numVisibleMeshes;
+    uint enableFrustumCulling;
+    uint enableOcclusionCulling;
+
+    float zNear;
+    float zFar;
+    float proj00;  
+    float proj11;
+};
+
+layout(set = 0, binding = 2) uniform sampler2D uHZB;
+
+layout(set = 1, binding = 0) readonly buffer SphereBuffer { vec4 spheres[]; };
+
+uvec4 readCmd0_3(uint i) {
+    uint o = i * 5u;
+    return uvec4(dc[o+0], dc[o+1], dc[o+2], dc[o+3]);
+}
+uint   readFirstInstance(uint i) { return dc[i*5u + 4u]; }
+void   writeInstanceCount(uint i, uint v) { dc[i*5u + 1u] = v; }
+
+bool isSphereInFrustum(vec4 centerRadius){
+    vec3 center = centerRadius.xyz;
+    float radius = centerRadius.w;
+    
+    for(int i = 0; i < 6; ++i){
+        if (dot(planes[i], vec4(center, 1.0)) < -radius) return false;
+    }
+    return true;
+}
+
+bool projectSphere(vec3 center, float radius, float near, float p00, float p11, out vec4 aabbUV){
+    
+    // 1 near plane cull
+    if(-center.z - radius < near)
+        return false;
+
+    // 2 xz plane projection
+    vec2 centerX = vec2(center.x, -center.z);
+    vec2 tangentX = vec2(sqrt(max(dot(centerX, centerX) - radius * radius, 0.0)), radius);
+    vec2 minX = mat2(tangentX.x,  tangentX.y, -tangentX.y, tangentX.x) * centerX;
+    vec2 maxX = mat2(tangentX.x, -tangentX.y, tangentX.y,  tangentX.x) * centerX;
+
+    // 3 yz plane projection
+    vec2 centerY = -center.yz;
+    vec2 tangentY = vec2(sqrt(max(dot(centerY, centerY) - radius * radius, 0.0)), radius);
+    vec2 minY = mat2(tangentY.x,  tangentY.y, -tangentY.y, tangentY.x) * centerY;
+    vec2 maxY = mat2(tangentY.x, -tangentY.y, tangentY.y,  tangentY.x) * centerY;
+
+    // 4 clipping space -> ndc
+    aabbUV = vec4(minX.x / minX.y * p00, minY.x / minY.y * p11, maxX.x / maxX.y * p00, maxY.x / maxY.y * p11);
+
+    // 5 ndc -> uv
+    aabbUV = aabbUV.xwzy * vec4(0.5, -0.5, 0.5, -0.5) + vec4(0.5);
+
+    return true;
+}
+
+float sampleHZB(vec4 aabbUV){
+
+    ivec2 texSize = textureSize(uHZB, 0);
+
+    float width = (aabbUV.z - aabbUV.x) * float(texSize.x);
+    float height = (aabbUV.w - aabbUV.y) * float(texSize.y);
+    float level = floor(log2(max(width, height)));
+
+    level = max(level, 0.0);
+    vec2 uvCenter = (aabbUV.xy + aabbUV.zw) * 0.5;
+    float d = textureLod(uHZB, uvCenter, level).r;
+
+    vec2 uv0 = vec2(aabbUV.x, aabbUV.y);
+    vec2 uv1 = vec2(aabbUV.z, aabbUV.y);
+    vec2 uv2 = vec2(aabbUV.z, aabbUV.w);
+    vec2 uv3 = vec2(aabbUV.x, aabbUV.w);
+    d = max(d, textureLod(uHZB, uv0, level).r);
+    d = max(d, textureLod(uHZB, uv1, level).r);
+    d = max(d, textureLod(uHZB, uv2, level).r);
+    d = max(d, textureLod(uHZB, uv3, level).r);
+
+    return d;
+}
+
+
+void main() {
+    uint idx = gl_GlobalInvocationID.x;
+    if (idx >= numMeshesToCull) return;
+    uint baseInstance = readFirstInstance(idx);
+    vec4 centerRadius = spheres[baseInstance];
+
+    // frustum culling
+    uint visible = 1u;
+    if (enableFrustumCulling != 0u) {
+        visible = isSphereInFrustum(centerRadius) ? 1u : 0u;
+    }
+
+    // occlusion culling
+    if(visible == 1u && enableOcclusionCulling != 0u){
+        vec3 center = centerRadius.xyz;
+        float radius = centerRadius.w;
+        vec4 aabb;
+        if(projectSphere(center, radius, zNear, proj00, proj11, aabb)){
+            float hzbDepth = sampleHZB(aabb);
+            float sphereFrontDist = max(-center.z - radius, zNear);
+            float sphereDepth   = zNear / sphereFrontDist;
+            visible = hzbDepth > sphereDepth ? 0u : 1u;
+        }
+    }
+    writeInstanceCount(idx, visible);   
+    atomicAdd(numVisibleMeshes, visible);
+}

@@ -1,0 +1,65 @@
+#version 460
+#extension GL_GOOGLE_include_directive : require
+#extension GL_EXT_ray_tracing : require
+#include "ddgi_common.glsl"
+#define PROBE_STATUS_OFF 0
+#define PROBE_STATUS_SLEEP 1
+#define PROBE_STATUS_ACTIVE 4
+#define PROBE_STATUS_UNINITIALIZED 6
+
+struct RayPayload {
+    vec3        radiance;
+    float       dist;
+};
+
+layout(location = 0) rayPayloadEXT RayPayload payload; 
+
+ivec3 probeToGrid( int probeIndex ) {
+    const int probeX = probeIndex % probeCounts.x;
+    const int probeCountsXY = probeCounts.x * probeCounts.y;
+    const int probeY = (probeIndex % probeCountsXY) / probeCounts.x;
+    const int probeZ = probeIndex / probeCountsXY;
+    return ivec3( probeX, probeY, probeZ );
+}
+
+
+vec3 gridToWorldNoOffsets( ivec3 gridIndex ) {
+    return gridIndex * probeSpacing.xyz + probeGridPosition.xyz;
+}
+
+vec3 gridToWorld( ivec3 gridIndex, int probeIndex ) {
+  const int probeCountsXY = probeCounts.x * probeCounts.y;
+  ivec2 probeOffsetSamplingUV = ivec2(probeIndex % probeCountsXY, probeIndex / probeCountsXY);
+  vec3 probeOffset = enableProbeOffset == 1u ? texelFetch(uOffset, probeOffsetSamplingUV, 0).rgb : vec3(0);
+  return gridToWorldNoOffsets( gridIndex ) + probeOffset;
+}
+
+vec3 sphericalFibonacci(float i, float n){
+    const float PHI = 0.5 * (sqrt(5.0) + 1.0);
+    float phi       = 2.0 * PI * fract(i * (PHI - 1.0));
+    float cosTheta = 1.0 - (2.0 * i + 1.0) / n;
+    float sinTheta = sqrt(max(0.0, 1.0 - cosTheta * cosTheta));
+    return vec3(cos(phi) * sinTheta, sin(phi) * sinTheta, cosTheta);
+}
+
+void main(){
+    // 1 get probe index and ray counts
+    ivec2 launchId = ivec2(gl_LaunchIDEXT.xy);
+    int probeIndex = int(launchId.y);
+
+    const int totalCount = probeCounts.x * probeCounts.y * probeCounts.z;
+    if (probeIndex >= totalCount) {
+        return;
+    }
+    ivec3 gridIndex = probeToGrid(probeIndex);
+
+    // 2 ray trace
+    int rayIndex = int(launchId.x);
+    vec3 origin = gridToWorld(gridIndex, probeIndex);
+    vec3 dir = normalize( mat3(randomRotation) * sphericalFibonacci(rayIndex, probeRays));
+    payload.radiance = vec3(0.0f);
+    payload.dist = 0.0f;
+    float tMin = max(0.01 * probeSpacing.x, 1e-3); 
+    traceRayEXT(uAS, gl_RayFlagsOpaqueEXT, 0xff, 0, 0, 0, origin, tMin, dir, 100.0, 0);
+    imageStore(uRadiance, ivec2(rayIndex, probeIndex), vec4(payload.radiance, payload.dist));
+}

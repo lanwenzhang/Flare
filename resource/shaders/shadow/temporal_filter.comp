@@ -1,0 +1,267 @@
+#version 460
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+layout(set = 0, binding = 2) uniform taaParams{
+    mat4 inverseVP;   
+    mat4 prevVP;      
+ 	vec2 currPixelOffset;
+    vec2 prevPixelOffset;        
+    vec2 resolution;   
+};
+
+layout(set = 2, binding = 0) uniform sampler2D uPrevNormal;
+layout(set = 2, binding = 1) uniform sampler2D uPrevDepth;
+layout(set = 2, binding = 2) uniform sampler2D uCurrNormal;
+layout(set = 2, binding = 3) uniform sampler2D uCurrDepth;
+layout(set = 2, binding = 4) uniform sampler2D uVelocity;
+layout(set = 2, binding = 5) uniform sampler2D uHistoryVisibility;
+layout(set = 2, binding = 6) uniform sampler2D uCurrentVisibility;
+layout(set = 2, binding = 7) uniform sampler2D uHistoryMoments;
+layout(set = 2, binding = 8, rgba16f) writeonly uniform image2D uMoments;
+layout(set = 2, binding = 9, rg16f)   writeonly uniform image2D uVariance;
+
+layout(push_constant) uniform PushConstants{
+    float normalDistance;
+	float planeDistance;
+	float alphaVis;
+	float alphaMoment;
+} pc;
+
+
+#define MAX_HISTORY      32.0f
+
+vec2 pixelToUV(ivec2 pixel, vec2 resolution){
+    return (vec2(pixel) + vec2(0.5)) / vec2(resolution);
+}
+
+ivec2 uvToPixel(vec2 uv, vec2 resolution){
+    return ivec2(uv * resolution - vec2(0.5));
+}
+
+vec3 uvToNDC(vec2 uv, float depth){
+    return vec3(uv * 2.0 - 1.0, depth);
+}
+
+vec3 uvToWorldPos(vec2 uv, float depth, mat4 invVP){
+    vec4 constructed = vec4(uvToNDC(uv, depth), 1.0);
+    vec4 unprojected = invVP * constructed;
+    return unprojected.xyz / unprojected.w;
+}
+
+bool outOfFrame(vec2 uv){
+    return any(lessThan(uv, vec2(0.0f))) || any(greaterThanEqual(uv, vec2(1.0f)));
+}
+
+bool inFramePixel(ivec2 p, ivec2 size) {
+    return all(greaterThanEqual(p, ivec2(0))) && all(lessThan(p, size));
+}
+
+bool planeDistanceDisocclusion(vec3 currPos, vec3 historyPos, vec3 currNormal){
+    vec3  toCurrent    = currPos - historyPos;
+    float distToPlane  = abs(dot(toCurrent, currNormal));
+    return distToPlane > pc.planeDistance;
+}
+
+bool normalDisocclusion(vec3 currNormal, vec3 historyNormal){
+    float nd = dot(currNormal, historyNormal);
+    return (1.0f - nd) > pc.normalDistance;
+}
+
+uint decodeId8(float x) { return uint(round(x * 255.0)); }
+
+
+bool reproject4TapValidBilinear(
+    ivec2  currPixel,
+    vec2   currUV,
+    float  currDepth,
+    vec3   currNormal,
+    vec2   reprojectedUV,
+    mat4   invCurrVP,
+    mat4   prevVP,
+    vec2   resolution,
+
+    out float outHistoryVis,
+    out vec2  outHistoryMoments,
+    out float outPrevHistoryLen
+){
+    ivec2 size = ivec2(resolution);
+
+    vec2 histPixF = reprojectedUV * resolution - vec2(0.5);
+    ivec2 basePix = ivec2(floor(histPixF));
+    vec2  frac    = fract(histPixF);
+
+    float w00 = (1.0 - frac.x) * (1.0 - frac.y);
+    float w10 = (frac.x)       * (1.0 - frac.y);
+    float w01 = (1.0 - frac.x) * (frac.y);
+    float w11 = (frac.x)       * (frac.y);
+
+    const ivec2 offs[4] = ivec2[4]( ivec2(0,0), ivec2(1,0), ivec2(0,1), ivec2(1,1) );
+    const float ws[4]   = float[4]( w00, w10, w01, w11 );
+
+    vec3 currPos = uvToWorldPos(currUV, currDepth, invCurrVP);
+
+    float sumw = 0.0;
+    float accVis = 0.0;
+    vec2  accMom = vec2(0.0);
+    float accLen = 0.0;
+
+    uint currId = decodeId8(texelFetch(uCurrNormal, currPixel, 0).a);
+
+    mat4 prevInvVP = inverse(prevVP);
+
+    // --- 4 taps validity check ---
+    for (int i = 0; i < 4; i++) {
+        ivec2 p = basePix + offs[i];
+        if (!inFramePixel(p, size)) continue;
+
+        float d = texelFetch(uPrevDepth, p, 0).r;
+        if (d == 1.0) continue;
+
+        vec4 prevN4 = texelFetch(uPrevNormal, p, 0);
+        vec3 prevN  = prevN4.rgb;
+
+        uint prevId = decodeId8(prevN4.a);
+        if (prevId != currId) continue;
+
+        vec3 histPos = uvToWorldPos(reprojectedUV, d, prevInvVP);
+
+        if (normalDisocclusion(currNormal, prevN) ||
+            planeDistanceDisocclusion(currPos, histPos, currNormal))
+            continue;
+
+        float w = ws[i];
+        float hVis = texelFetch(uHistoryVisibility, p, 0).r;
+        vec4  hM4  = texelFetch(uHistoryMoments,    p, 0);
+        vec2  hMom = hM4.rg;
+        float hLen = hM4.b;
+
+        accVis += w * hVis;
+        accMom += w * hMom;
+        accLen += w * hLen;
+        sumw   += w;
+    }
+
+    if (sumw >= 0.01) {
+        outHistoryVis     = accVis / sumw;
+        outHistoryMoments = accMom / sumw;
+        outPrevHistoryLen = accLen / sumw;
+        return true;
+    }
+
+    // --- fallback: 3x3 cross-bilateral (radius=1) ---
+    ivec2 center = ivec2(round(histPixF));
+    float cnt = 0.0;
+
+    float fbVis = 0.0;
+    vec2  fbMom = vec2(0.0);
+    float fbLen = 0.0;
+
+    for (int yy = -1; yy <= 1; yy++) {
+        for (int xx = -1; xx <= 1; xx++) {
+            ivec2 p = center + ivec2(xx, yy);
+            if (!inFramePixel(p, size)) continue;
+
+            float d = texelFetch(uPrevDepth, p, 0).r;
+            if (d == 1.0) continue;
+
+            vec4 prevN4 = texelFetch(uPrevNormal, p, 0);
+            vec3 prevN  = prevN4.rgb;
+
+            uint prevId = decodeId8(prevN4.a);
+            if (prevId != currId) continue;
+            vec3 histPos = uvToWorldPos(reprojectedUV, d, prevInvVP);
+
+            if (normalDisocclusion(currNormal, prevN) ||
+                planeDistanceDisocclusion(currPos, histPos, currNormal))
+                continue;
+
+            fbVis += texelFetch(uHistoryVisibility, p, 0).r;
+            vec4 hM4 = texelFetch(uHistoryMoments, p, 0);
+            fbMom += hM4.rg;
+            fbLen += hM4.b;
+            cnt += 1.0;
+        }
+    }
+
+    if (cnt > 0.0) {
+        outHistoryVis     = fbVis / cnt;
+        outHistoryMoments = fbMom / cnt;
+        outPrevHistoryLen = fbLen / cnt;
+        return true;
+    }
+
+    return false;
+}
+
+
+
+void main(){    
+    // 1 current
+    ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
+    vec2 uv = pixelToUV(pixel, resolution);
+    float currDepth = texelFetch(uCurrDepth, pixel, 0).r;
+    vec3 currNormal = texelFetch(uCurrNormal, pixel, 0).rgb;
+    float currVis = texelFetch(uCurrentVisibility, pixel, 0).r;
+
+    // 2 history
+    vec2  outVisVar      = vec2(0.0f);
+    vec2  outMoments     = vec2(0.0f);
+    float historyLength  = 0.0f;
+    if (currDepth != 1.0f){
+       // 2.1 history uv
+       vec2 velocityPixels = texelFetch(uVelocity, pixel, 0).rg;
+       vec2 velocityUV = velocityPixels / resolution;
+       vec2 screenUV = pixelToUV(pixel, resolution);
+       vec2 reprojectedUV = screenUV + velocityUV;
+       ivec2 reprojectedPixel = uvToPixel(reprojectedUV, resolution);
+
+       bool success = true;
+       float historyDepth   = 0.0f;
+       vec3  historyNormal  = vec3(0.0f);
+       float historyVis     = 0.0f;
+       vec2  historyMoments = vec2(0.0f);
+       float prevHistoryLen = 0.0f;
+
+       // 2.2 validation check
+       // 2.2.1 out of frame
+       if (outOfFrame(reprojectedUV))
+           success = false;
+       if (success) {
+            success = reproject4TapValidBilinear(
+            pixel,
+            uv,
+            currDepth,
+            currNormal,
+            reprojectedUV,
+            inverseVP,
+            prevVP,
+            resolution,
+            historyVis,
+            historyMoments,
+            prevHistoryLen
+            );
+        }
+
+        historyLength = success ? (prevHistoryLen + 1.0f) : 1.0f;
+        historyLength = min(historyLength, MAX_HISTORY);
+
+
+        // 3 temporal accumulation
+        float alpha        = success ? max(pc.alphaVis,    1.0f / historyLength) : 1.0f;
+        float alphaMoments = success ? max(pc.alphaMoment, 1.0f / historyLength) : 1.0f;
+
+        // 3.1 moments
+        vec2 currMoments;
+        currMoments.r = currVis;
+        currMoments.g = currVis * currVis;
+        outMoments = success ? mix(historyMoments, currMoments, alphaMoments) : currMoments;
+
+        // 3.2 visibility and variance
+        float blendedVis = success ? mix(historyVis, currVis, alpha): currVis;
+        float variance = max(0.0f, outMoments.y - outMoments.r * outMoments.r);
+        outVisVar.x = blendedVis;
+        outVisVar.y = variance;
+    }
+   imageStore(uMoments, ivec2(pixel), vec4(outMoments, historyLength, 0.0f));
+   imageStore(uVariance, ivec2(pixel), vec4(outVisVar, 0.0f, 0.0f));
+}

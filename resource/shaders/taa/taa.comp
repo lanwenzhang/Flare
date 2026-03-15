@@ -1,0 +1,215 @@
+#version 460
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+layout(set = 0, binding = 2) uniform taaParams{
+    mat4 inverseVP;   
+    mat4 prevVP;      
+ 	vec2 currPixelOffset;
+    vec2 prevPixelOffset;        
+    vec2 resolution;   
+};
+
+layout(set = 1, binding = 0) uniform sampler2D uDepth;
+layout(set = 1, binding = 1) uniform sampler2D uVelocity;
+layout(set = 1, binding = 2) uniform sampler2D uCurrent;
+layout(set = 1, binding = 3) uniform sampler2D uHistory;
+layout(set = 1, binding = 4, rgba16f) uniform image2D uTAAOutput;
+
+vec2 pixelPosToUV(ivec2 pixelPos, vec2 resolution){
+    vec2 uv = floor(pixelPos) + 0.5f;
+    return uv / resolution;
+}
+
+vec3 rgbToYCoCg(vec3 c){
+  return vec3(c.x/4.0 + c.y/2.0 + c.z/4.0, c.x/2.0 - c.z/2.0, -c.x/4.0 + c.y/2.0 - c.z/4.0 );
+}
+
+vec3 YCoCgToRGB(vec3 c){
+    return clamp(vec3(c.x + c.y - c.z,
+                      c.x + c.z,
+                      c.x - c.y - c.z), vec3(0), vec3(1));
+}
+
+void findClosestFrag3x3(ivec2 pixelPos, out ivec2 closestPos, out float closestDepth){
+    closestDepth = 1.0f;
+    closestPos = ivec2(0, 0);
+
+    for(int x = -1; x <= 1; ++x){
+        for(int y = -1; y <= 1; ++y){
+            ivec2 pixelNeighborPos = pixelPos + ivec2(x, y);
+            pixelNeighborPos = clamp(pixelNeighborPos, ivec2(0, 0), ivec2(resolution.x - 1, resolution.y - 1));
+            float currDepth = texelFetch(uDepth, pixelNeighborPos, 0).r;
+            if( currDepth < closestDepth){
+                closestDepth = currDepth;
+                closestPos = pixelNeighborPos;
+            }
+        }
+    }
+}
+
+vec3 sampleHistoryCatmullRom(vec2 uv){
+
+    vec2 samplePos = uv * resolution;
+    vec2 texPos1 = floor(samplePos - 0.5f) + 0.5f;
+
+    vec2 f = samplePos - texPos1;
+    vec2 w0 = f * (-0.5f + f * (1.0f - 0.5f * f));
+    vec2 w1 = 1.0f + f * f * (-2.5f + 1.5f * f);
+    vec2 w2 = f * (0.5f + f * (2.0f - 1.5f * f));
+    vec2 w3 = f * f * (-0.5f + 0.5f * f);
+    vec2 w12 = w1 + w2;
+    vec2 offset12 = w2 / (w1 + w2);
+
+    vec2 texPos0 = texPos1 - 1;
+    vec2 texPos3 = texPos1 + 2;
+    vec2 texPos12 = texPos1 + offset12;
+
+    texPos0 /= resolution;
+    texPos3 /= resolution;
+    texPos12 /= resolution;
+
+    vec3 result = vec3(0);
+    result += textureLod(uHistory, vec2(texPos0.x, texPos0.y), 0).rgb * w0.x * w0.y;
+    result += textureLod(uHistory, vec2(texPos12.x, texPos0.y), 0).rgb * w12.x * w0.y;
+    result += textureLod(uHistory, vec2(texPos3.x, texPos0.y), 0).rgb * w3.x * w0.y;
+
+    result += textureLod(uHistory, vec2(texPos0.x, texPos12.y), 0).rgb * w0.x * w12.y;
+    result += textureLod(uHistory, vec2(texPos12.x, texPos12.y), 0).rgb * w12.x * w12.y;
+    result += textureLod(uHistory, vec2(texPos3.x, texPos12.y), 0).rgb * w3.x * w12.y;
+
+    result += textureLod(uHistory, vec2(texPos0.x, texPos3.y), 0).rgb * w0.x * w3.y;
+    result += textureLod(uHistory, vec2(texPos12.x, texPos3.y), 0).rgb * w12.x * w3.y;
+    result += textureLod(uHistory, vec2(texPos3.x, texPos3.y), 0).rgb * w3.x * w3.y;
+
+    result = rgbToYCoCg(result.rgb);
+
+    return result;
+}
+
+vec4 sampleCurrent(ivec2 pixelPos){
+
+    vec4 color = texelFetch(uCurrent, pixelPos, 0);
+    return vec4(rgbToYCoCg(color.rgb), color.a);
+
+}
+
+float filterCubic(in float x, in float B, in float C) {
+    float y = 0.0f;
+    float x2 = x * x;
+    float x3 = x * x * x;
+    if(x < 1)
+        y = (12 - 9 * B - 6 * C) * x3 + (-18 + 12 * B + 6 * C) * x2 + (6 - 2 * B);
+    else if (x <= 2)
+        y = (-B - 6 * C) * x3 + (6 * B + 30 * C) * x2 + (-12 * B - 48 * C) * x + (8 * B + 24 * C);
+
+    return y / 6.0f;
+}
+
+float filterCatmullRom(float value) {
+    return filterCubic(value, 0, 0.5f);
+}
+
+float subsampleFilter(float value) {
+    return filterCatmullRom(value * 2);
+}
+
+vec3 taa(ivec2 pixelPos){
+    // 1 motion vector sampling
+    // 1.1 find closest depth in 3x3
+    float closestDepth = 1.0f;
+    ivec2 closestPos = ivec2(0, 0);
+    findClosestFrag3x3(pixelPos.xy, closestPos, closestDepth);
+
+    // 1.2 sample motion vectors
+    vec2 velocityPixels = texelFetch(uVelocity, closestPos, 0).rg;
+    vec2 velocityUV = velocityPixels / resolution;
+    vec2 screenUV = pixelPosToUV(pixelPos, resolution);
+    vec2 reprojectedUV = screenUV + velocityUV;
+    reprojectedUV = clamp(reprojectedUV, vec2(0.0), vec2(1.0));
+
+    // 2 history frame sampling
+    vec3 historyColor = vec3(0.0f);
+    historyColor = sampleHistoryCatmullRom(reprojectedUV);
+
+    // 3 current frame sampling
+    vec3 currSampleTotal = vec3(0.0f);
+    float currSampleWeight = 0.0f;
+    vec3 neighborhoodMin = vec3(10000);
+    vec3 neighborhoodMax = vec3(-10000);
+    vec3 m1 = vec3(0.0f);
+    vec3 m2 = vec3(0.0f);
+
+    for(int x = -1; x <= 1; ++x){
+        for(int y = -1; y <= 1; ++y){
+            ivec2 pixelNeighborPos = pixelPos + ivec2(x, y);
+            pixelNeighborPos = clamp(pixelNeighborPos, ivec2(0, 0), ivec2(resolution.x - 1, resolution.y - 1));
+
+            vec3 currSample = sampleCurrent(pixelNeighborPos).rgb;
+            vec2 subSample = vec2(x * 1.0f, y * 1.0f);
+            float subSampleDist = length(subSample);
+            float subSampleWeight = subsampleFilter(subSampleDist);
+
+            currSampleTotal += currSample * subSampleWeight;
+            currSampleWeight += subSampleWeight;
+
+            neighborhoodMin = min( neighborhoodMin, currSample );
+            neighborhoodMax = max( neighborhoodMax, currSample );
+
+            m1 += currSample;
+            m2 += currSample * currSample;
+        }
+    }
+     vec3 currSample = currSampleTotal / currSampleWeight;
+
+    bool outOfBounds = any(lessThan(reprojectedUV, vec2(0.0))) || any(greaterThan(reprojectedUV, vec2(1.0)));
+    if (outOfBounds) return currSample;
+
+    // 4 history constaint
+    const float rcpSampleCount = 1.0 / 9.0;
+    const float clampingFactor = 1.0;
+
+    vec3 mu  = m1 * rcpSampleCount;
+    vec3 var = max(vec3(0.0), (m2 * rcpSampleCount) - mu * mu);
+    vec3 sigma = sqrt(var) * clampingFactor;
+
+    vec3 colorMin = mu - sigma;
+    vec3 colorMax = mu + sigma;
+
+    historyColor = clamp(historyColor, colorMin, colorMax);
+
+    // 5 resolve
+    float motionLenPixels = length(velocityPixels);
+    const float alphaMin = 0.05;
+    const float alphaMax = 0.40;
+    float motionT = smoothstep(0.0, 2.0, motionLenPixels);
+    float alpha = mix(alphaMin, alphaMax, motionT);
+
+//    const float newFrameWeight = 0.2;
+//    float motionLenPixels = length(velocityPixels);
+//    float motionWeight    = smoothstep(0.5, 2.5, motionLenPixels);
+//    float blendWeight = clamp(newFrameWeight * (0.4 + 0.6 * motionWeight), 0.0, 1.0);
+    vec3 result = mix(historyColor, currSample, alpha);
+    return result;
+}   
+
+vec3 taaSimple( ivec2 pixelPos ) {
+    vec2 velocityPixels = texelFetch(uVelocity, pixelPos, 0).rg;
+    vec2 velocityUV = velocityPixels / resolution;
+    vec2 screenUV = pixelPosToUV(pixelPos, resolution);
+    vec2 reprojectedUV = screenUV - velocityUV;
+    vec3 historyColor =  textureLod(uHistory, reprojectedUV, 0).rgb;
+    vec3 CurrentColor = textureLod(uCurrent, screenUV, 0).rgb;
+
+    return mix(CurrentColor, historyColor, 0.7f);
+}
+
+void main(){
+	ivec3 pixelPos = ivec3(gl_GlobalInvocationID.xyz);
+    const vec2 screenUV = pixelPosToUV(pixelPos.xy, resolution);
+
+    vec3 finalColor = vec3(0.0f);
+    finalColor = taa(pixelPos.xy);
+    finalColor = YCoCgToRGB(finalColor);
+//    finalColor = taaSimple(pixelPos.xy);
+    imageStore(uTAAOutput, pixelPos.xy, vec4(finalColor, 1.0));
+}

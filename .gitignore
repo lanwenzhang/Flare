@@ -1,0 +1,5 @@
+# Visual Studio cache
+.vs/
+
+# build output
+out/
