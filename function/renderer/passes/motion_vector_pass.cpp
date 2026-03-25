@@ -9,6 +9,9 @@ namespace flare::renderer {
 	}
 
 	void MotionVectorPass::createImages(const FrameGraph& frameGraph) {
+		auto [width, height] = frameGraph.getAttachmentSize("motion_vectors");
+		mWidth = width;
+		mHeight = height;
 
 		SamplerDesc pointClamp{};
 		pointClamp.minFilter = VK_FILTER_NEAREST;
@@ -57,6 +60,15 @@ namespace flare::renderer {
 		}
 	}
 
+	void MotionVectorPass::destroyDescriptors() {
+		mDescriptorSet.reset();
+		mDescriptorPool.reset();
+		mDescriptorSetLayout.reset();
+
+		mDepthParam.reset();
+		mMotionVectorParam.reset();
+	}
+
 	void MotionVectorPass::createPipeline(const DescriptorSetLayout::Ptr& frameSetLayout) {
 		mPipeline = ComputePipeline::create(mDevice);
 		auto cullShader = Shader::create(mDevice, "shaders/motion_vector/motion_vector_cs.spv", VK_SHADER_STAGE_COMPUTE_BIT, "main");
@@ -80,5 +92,11 @@ namespace flare::renderer {
 
 		cmd->transitionImageLayout(mMotionVectors->getImage()->getImage(), mMotionVectors->getImage()->getFormat(),
 								   VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+	}
+
+	void MotionVectorPass::resize(const Texture::Ptr& depthTex, const FrameGraph& frameGraph, int frameCount) {
+		createImages(frameGraph);
+		destroyDescriptors();
+		createDescriptor(depthTex, frameCount);
 	}
 }

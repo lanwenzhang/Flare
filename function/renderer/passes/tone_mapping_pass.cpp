@@ -120,6 +120,20 @@ namespace flare::renderer {
 		}
 	}
 
+	void ToneMappingPass::destroyDescriptorSet() {
+		mParams.clear();
+		mDescriptorSet.reset();
+		mDescriptorPool.reset();
+		mDescriptorSetLayout.reset();
+	}
+
+	void ToneMappingPass::resize(const SwapChain::Ptr& swapChain, const Texture::Ptr& colorTexture) {
+		mColor = colorTexture;
+		destroyDescriptorSet();
+		createDescriptorSet();
+		createPipeline(swapChain);
+	}
+
 	void ToneMappingPass::render(const CommandBuffer::Ptr& cmd, const SwapChain::Ptr& swapChain, const Texture::Ptr& colorTexture, uint32_t imageIndex, int frameIndex){
 		
 		cmd->transitionImageLayout(swapChain->getImage(imageIndex), swapChain->getFormat(), VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,

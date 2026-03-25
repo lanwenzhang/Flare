@@ -9,6 +9,9 @@ namespace flare::renderer {
 	}
 
 	void GeometryPass::createImages(const CommandPool::Ptr& commandPool, const FrameGraph& frameGraph) {
+		auto [width, height] = frameGraph.getAttachmentSize("gbuffer_depth");
+		mWidth = width;
+		mHeight = height;
 
 		SamplerDesc pointClamp{};
 		pointClamp.minFilter = VK_FILTER_NEAREST;
@@ -54,6 +57,10 @@ namespace flare::renderer {
 		initImageLayout(mPrevGDepth->getImage());
 		cmd->end();
 		cmd->submitSync(mDevice->getGraphicQueue());
+	}
+
+	void GeometryPass::resize(const CommandPool::Ptr& commandPool, const FrameGraph& frameGraph) {
+		createImages(commandPool, frameGraph);
 	}
 
 	void GeometryPass::createPipeline(const FrameGraph& frameGraph, const GeometryBuffer::Ptr& geometryBuffer,

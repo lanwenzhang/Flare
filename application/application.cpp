@@ -410,6 +410,10 @@ namespace flare::app {
 		mWidth = mSwapChain->getExtent().width;
 		mHeight = mSwapChain->getExtent().height;
 
+		if (mRenderer) {
+			mRenderer->resize(mSwapChain, mFramesInFlight);
+		}
+
 		mTAAParams.resolution = glm::vec2(float(mWidth), float(mHeight));
 		mResetTAAHistory = true;
 		initImGui();

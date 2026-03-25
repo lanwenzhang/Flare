@@ -51,6 +51,16 @@ namespace flare::renderer {
 		}
 	}
 
+	void CullingPass::destroyDescriptors() {
+		mDescriptorSet.reset();
+		mDescriptorPool.reset();
+		mDescriptorSetLayout.reset();
+
+		mIndirectParam.reset();
+		mCullingDataParam.reset();
+		mHZBParam.reset();
+	}
+
 	void CullingPass::createPipeline(const DescriptorSetLayout::Ptr& staticSetLayout) {
 		mPipeline = ComputePipeline::create(mDevice);
 		auto cullShader = Shader::create(mDevice, "shaders/culling/culling_cs.spv", VK_SHADER_STAGE_COMPUTE_BIT, "main");
@@ -157,6 +167,11 @@ namespace flare::renderer {
 		hostBarrier.size = VK_WHOLE_SIZE;
 
 		vkCmdPipelineBarrier(cmd->getCommandBuffer(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_HOST_BIT, 0, 0, nullptr, 1, &hostBarrier, 0, nullptr);
+	}
+
+	void CullingPass::resize(const Texture::Ptr& hzbTex, int frameCount) {
+		destroyDescriptors();
+		createDescriptor(hzbTex, frameCount);
 	}
 
 	uint32_t CullingPass::getVisibleCount(int frameIndex)const {

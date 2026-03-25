@@ -228,14 +228,48 @@ namespace flare::renderer {
 			// ==== other attachments ====
 			const bool isDepth = isDepthFormat(info.format);
 			VkImageUsageFlags usage = isDepth 
-				? (VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT)
-				: (VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT |
-					VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
+				? (VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | 
+				   VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT)
+				: (VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | 
+				   VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
 
 			VkImageAspectFlags aspect = isDepth ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
 			info.image = Image::create(mDevice, info.width, info.height, info.format, VK_IMAGE_TYPE_2D,
 						 VK_IMAGE_TILING_OPTIMAL, usage, VK_SAMPLE_COUNT_1_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, aspect);
 		}
+	}
+
+	void FrameGraph::resize(uint32_t width, uint32_t height) {
+		auto resizeAttachment = [&](const std::string& name) {
+			auto it = mResourceMap.find(name);
+			if (it == mResourceMap.end()) return;
+
+			auto& res = it->second;
+			if (res.type != FrameGraphResourceType::Attachment) return;
+			if (res.attachment.external) return;
+
+			res.attachment.width = width;
+			res.attachment.height = height;
+			res.attachment.image.reset();
+			};
+
+		resizeAttachment("depth_linear");
+		resizeAttachment("depth");
+		resizeAttachment("hzb");
+
+		resizeAttachment("gbuffer_color");
+		resizeAttachment("gbuffer_normal");
+		resizeAttachment("gbuffer_metallic_roughness");
+		resizeAttachment("gbuffer_depth");
+
+		resizeAttachment("motion_vectors");
+		resizeAttachment("visibility");
+		resizeAttachment("indirect_lighting");
+		resizeAttachment("ao");
+		resizeAttachment("lighting");
+		resizeAttachment("taa_output");
+
+		createImages();
 	}
 
 	bool FrameGraph::setRecord(const std::string & passName, std::function<void()> record) {

@@ -44,14 +44,7 @@ namespace flare::renderer{
 	}
 
 	GTAOPass::~GTAOPass() {
-		if (!mDevice) return;
-		VkDevice device = mDevice->getDevice();
-		for (VkImageView view : mDepthMIPViews) {
-			if (view != VK_NULL_HANDLE) {
-				vkDestroyImageView(device, view, nullptr);
-			}
-		}
-		mDepthMIPViews.clear();
+        destroyMipViews();
 	}
 
 	void GTAOPass::init(const CommandPool::Ptr& commandPool, const GeometryPass::Ptr& geometryPass, const DescriptorSetLayout::Ptr& frameSetLayout, int frameCount) {
@@ -66,7 +59,10 @@ namespace flare::renderer{
 	}
 
 	void GTAOPass::createImages(const CommandPool::Ptr& commandPool) {
-		// depth prefilter
+        mWidth = static_cast<uint32_t>(mGDepth->getImage()->getWidth());
+        mHeight = static_cast<uint32_t>(mGDepth->getImage()->getHeight());
+        
+        //depth prefilter
         const VkImageUsageFlags usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 		const VkImageAspectFlags aspect = VK_IMAGE_ASPECT_COLOR_BIT;
 		mMipCount = 5;
@@ -348,6 +344,64 @@ namespace flare::renderer{
                 mDenoiseDescriptorSets[it]->updateStorageImage(set, BindingAOOut, mDenoiseAOOutParam->mImageInfos[0]);
             }
         }
+    }
+
+    void GTAOPass::destroyMipViews() {
+        if (!mDevice) return;
+        VkDevice device = mDevice->getDevice();
+        for (VkImageView view : mDepthMIPViews) {
+            if (view != VK_NULL_HANDLE) {
+                vkDestroyImageView(device, view, nullptr);
+            }
+        }
+        mDepthMIPViews.clear();
+    }
+
+    void GTAOPass::destroyDescriptors() {
+        mDepthFilterDescriptorSets.reset();
+        mDepthFilterDescriptorPool.reset();
+        mDepthFilterSetLayout.reset();
+
+        mAODescriptorSets.reset();
+        mAODescriptorPool.reset();
+        mAOSetLayout.reset();
+
+        mDenoiseDescriptorSets.clear();
+        mDenoiseDescriptorPool.reset();
+        mDenoiseSetLayout.reset();
+
+        mGDepthParam.reset();
+        mMip0Param.reset();
+        mMip1Param.reset();
+        mMip2Param.reset();
+        mMip3Param.reset();
+        mMip4Param.reset();
+        mGTAOParam.reset();
+
+        mAODepthParam.reset();
+        mAONormalParam.reset();
+        mAOHilbertParam.reset();
+        mAOAORawParam.reset();
+        mEdgesParam.reset();
+
+        mDenoiseAOSrcParam.reset();
+        mDenoiseEdgesParam.reset();
+        mDenoiseAOOutParam.reset();
+    }
+
+    void GTAOPass::resize(const CommandPool::Ptr& commandPool, const GeometryPass::Ptr& geometryPass) {
+        mGDepth = geometryPass->getGbufferDepth();
+        mGNormal = geometryPass->getGbufferNormal();
+
+        destroyMipViews();
+        createImages(commandPool);
+
+        destroyDescriptors();
+        createPrefilerDepthDS();
+        createAODS();
+        createDenoiseDS();
+
+        mAOPingPongIndex = 0;
     }
 
 	void GTAOPass::createPipelines(const DescriptorSetLayout::Ptr& frameSetLayout) {

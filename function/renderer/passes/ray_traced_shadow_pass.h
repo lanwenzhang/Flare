@@ -25,6 +25,9 @@ namespace flare::renderer {
                   const MotionVectorPass::Ptr& motionVectorPass,
                   const DescriptorSetLayout::Ptr& frameSetLayout, const DescriptorSetLayout::Ptr& staticSetLayout, int frameCount);
         void render(const CommandBuffer::Ptr& cmd, const DescriptorSet::Ptr& frameSet, const DescriptorSet::Ptr& staticSet, int frameIndex);
+        void resize(const CommandPool::Ptr& commandPool, const FrameGraph& frameGraph,
+                   const GeometryPass::Ptr& geometryPass, const MotionVectorPass::Ptr& motionVectorPass);
+        
         [[nodiscard]] auto getFilteredVisibility() const{
             if (mAtrousIterations <= 0) return mVariance;
             int last = (mAtrousIterations - 1) % 2;
@@ -38,6 +41,7 @@ namespace flare::renderer {
         void createShadowDS();
         void createTemporalFilterDS();
         void createAtrousDS();
+        void destroyDescriptors();
         void createPipeline(const DescriptorSetLayout::Ptr& frameSetLayout, const DescriptorSetLayout::Ptr& staticSetLayout);
         void rayTracedShadow(const CommandBuffer::Ptr& cmd, const DescriptorSet::Ptr& frameSet,
                              const DescriptorSet::Ptr& staticSet, int frameIndex);

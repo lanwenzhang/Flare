@@ -21,11 +21,13 @@ namespace flare::renderer {
 
 		void init(const FrameGraph& frameGraph, const Texture::Ptr& preDepth, int frameCount);
 		void render(const CommandBuffer::Ptr& cmd, int frameIndex);
+		void resize(const FrameGraph& frameGraph, const Texture::Ptr& preDepth, int frameCount);
 		[[nodiscard]] auto getHZB() { return mHZB; }
 
 	private:
 		void createImages(const FrameGraph& frameGraph);
 		void createDescriptors(int frameCount);
+		void destroyDescriptors();
 		void createPipeline();
 
 	private:

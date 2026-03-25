@@ -38,6 +38,15 @@ namespace flare::renderer {
 		void render(const CommandBuffer::Ptr& cmd, const DescriptorSet::Ptr& frameSet, const DescriptorSet::Ptr& probeSet,
 					const SphereBuffer::Ptr& sphereBuffer, int probeCount,
 				    Camera camera, DirectionalLight light, flare::app::LightPushConstant pc, int frameIndex);
+
+		void resize(const CommandPool::Ptr& commandPool,
+			const FrameGraph& frameGraph,
+			const GeometryPass::Ptr& geometryPass,
+			const DDGIPass::Ptr& ddgiPass,
+			const Texture::Ptr& visibilityTex,
+			const Texture::Ptr& indirectTex,
+			const GTAOPass::Ptr& gtaoPass);
+
 		[[nodiscard]] auto getSkybox() const { return mSkybox; }
 		[[nodiscard]] auto getLightingTex() const { return mLighting; }
 
@@ -47,6 +56,9 @@ namespace flare::renderer {
 							const DescriptorSetLayout::Ptr& probeSetLayout, const SphereBuffer::Ptr& sphereBuffer);
 		void createDescriptorSet();
 		void createSphereDS();
+
+		void destroyDescriptorSet();
+		void destroySphereDS();
 
 	public:
 		bool mShowProbe{ false };

@@ -21,10 +21,12 @@ namespace flare::renderer {
 
 		void init(const SwapChain::Ptr& swapChain, const Texture::Ptr& colorTexture, int frameCount);
 		void render(const CommandBuffer::Ptr& cmd, const SwapChain::Ptr& swapChain, const Texture::Ptr& colorTexture, uint32_t imageIndex, int frameIndex);
+		void resize(const SwapChain::Ptr& swapChain, const Texture::Ptr& colorTexture);
 
 	private: 
 		void createPipeline(const SwapChain::Ptr& swapChain);
 		void createDescriptorSet();
+		void destroyDescriptorSet();
 
 	private:
 		int mFrameCount{ 0 };

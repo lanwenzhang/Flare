@@ -48,11 +48,9 @@ namespace flare::renderer {
 		void init(const CommandPool::Ptr& commandPool, const GeometryPass::Ptr& geometryPass, 
 				  const DescriptorSetLayout::Ptr& frameSetLayout, int frameCount);
 		void render(const CommandBuffer::Ptr& cmd, const DescriptorSet::Ptr& frameSet, Camera camera, int frameIndex);
+		void resize(const CommandPool::Ptr& commandPool, const GeometryPass::Ptr& geometryPass);
 
-		[[nodiscard]] auto getFilteredAO() const {
-			int last = (mDenoisePasses - 1) % 2;
-			return (last == 0) ? mAO[0] : mAO[1];
-		}
+		[[nodiscard]] auto getFilteredAO() const { int last = (mDenoisePasses - 1) % 2; return (last == 0) ? mAO[0] : mAO[1];}
 		[[nodiscard]] auto getAO() const { return mAORaw; }
 
 	private:
@@ -60,11 +58,14 @@ namespace flare::renderer {
 		void createPrefilerDepthDS();
 		void createAODS();
 		void createDenoiseDS();
+		void destroyMipViews();
+		void destroyDescriptors();
 		void createPipelines(const DescriptorSetLayout::Ptr& frameSetLayout);
 		void depthMipPrefilter(const CommandBuffer::Ptr& cmd, Camera camera, int frameIndex);
 		void ambientOcclusion(const CommandBuffer::Ptr& cmd, const DescriptorSet::Ptr& frameSet, Camera camera, int frameIndex);
 		void denoiseAO(const CommandBuffer::Ptr& cmd, int frameIndex);
 		void updateBuffer(const DescriptorSet::Ptr& descriptorSet, int frameIndex);
+	
 	public:
 		GTAOParams mGTAO;
 

@@ -66,6 +66,8 @@ namespace flare::renderer {
 		void render(const CommandBuffer::Ptr& cmd, const DescriptorSet::Ptr& frameSet, const DescriptorSet::Ptr& staticSet, 
 					int frameIndex, Camera camera);
 
+		void resize(const FrameGraph& framegraph, const GeometryPass::Ptr& geometryPass);
+
 		[[nodiscard]] auto getProbeRTDS() { return mDescriptorSet; }
 		[[nodiscard]] auto getProbeRTDSLayout() { return mDescriptorSetLayout; }
 		[[nodiscard]] auto getProbeIrradiance() const{ return mProbeIrradiance[mIrradiancePingPongIndex];}
@@ -83,6 +85,7 @@ namespace flare::renderer {
 		void createIrradianceDS();
 		void createVisibilityDS();
 		void createSampleIrradianceDS();
+		void destroySampleIrradianceDS();
 		void createPipelines(const DescriptorSetLayout::Ptr& frameSetLayout, const DescriptorSetLayout::Ptr& staticSetLayout);
 		void probeRayTrace(const CommandBuffer::Ptr& cmd, const DescriptorSet::Ptr& frameSet, const DescriptorSet::Ptr& staticSet, int frameIndex, Camera camera);
 		void updateProbeOffset(const CommandBuffer::Ptr& cmd, int frameIndex);

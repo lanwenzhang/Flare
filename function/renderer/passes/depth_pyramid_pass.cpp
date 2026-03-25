@@ -110,6 +110,32 @@ namespace flare::renderer {
         }
     }
 
+    void DepthPyramidPass::destroyDescriptors() {
+        if (!mDevice) return;
+
+        VkDevice device = mDevice->getDevice();
+        for (VkImageView view : mHZBMipViews) {
+            if (view != VK_NULL_HANDLE) {
+                vkDestroyImageView(device, view, nullptr);
+            }
+        }
+        mHZBMipViews.clear();
+
+        mDescriptorSets.clear();
+        mDescriptorPool.reset();
+        mSetLayout.reset();
+
+        mSrcParam.reset();
+        mDstParam.reset();
+    }
+
+    void DepthPyramidPass::resize(const FrameGraph& frameGraph, const Texture::Ptr& preDepth, int frameCount) {
+        mPreDepth = preDepth;
+        destroyDescriptors();
+        createImages(frameGraph);
+        createDescriptors(frameCount);
+    }
+
     void DepthPyramidPass::createPipeline(){
         mPipeline = ComputePipeline::create(mDevice);
         auto cs = Shader::create(mDevice, "shaders/depth_pyramid/depth_pyramid_cs.spv", VK_SHADER_STAGE_COMPUTE_BIT, "main");

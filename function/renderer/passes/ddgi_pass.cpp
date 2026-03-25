@@ -19,7 +19,11 @@ namespace flare::renderer {
 		createPipelines(frameSetLayout, staticSetLayout);
 	}
 
-	void DDGIPass::createImages(const CommandPool::Ptr& commandPool, const FrameGraph& frameGraph) {
+	void DDGIPass::createImages(const CommandPool::Ptr& commandPool, const FrameGraph& frameGraph) {	
+		auto [width, height] = frameGraph.getAttachmentSize("indirect_lighting");
+		mWidth = width;
+		mHeight = height;
+
 		// radiance
 		SamplerDesc linearClamp{};
 		linearClamp.minFilter = VK_FILTER_LINEAR;
@@ -551,6 +555,41 @@ namespace flare::renderer {
 			mSampleSet->updateImage(set, BindingVisibility, mSampleVisibilityParam->mImageInfos[0]);
 			mSampleSet->updateStorageImage(set, BindingIndirectOut, mIndirectParam->mImageInfos[0]);
 		}
+	}
+
+	void DDGIPass::destroySampleIrradianceDS() {
+		mSampleSet.reset();
+		mSamplePool.reset();
+		mSampleSetLayout.reset();
+
+		mNormalParam.reset();
+		mDepthParam.reset();
+		mSampleIrradianceParam.reset();
+		mSampleVisibilityParam.reset();
+		mIndirectParam.reset();
+	}
+
+	void DDGIPass::resize(const FrameGraph& frameGraph, const GeometryPass::Ptr& geometryPass) {
+		auto [width, height] = frameGraph.getAttachmentSize("indirect_lighting");
+		mWidth = width;
+		mHeight = height;
+
+		mNormal = geometryPass->getGbufferNormal();
+		mDepth = geometryPass->getGbufferDepth();
+
+		SamplerDesc pointClamp{};
+		pointClamp.minFilter = VK_FILTER_NEAREST;
+		pointClamp.magFilter = VK_FILTER_NEAREST;
+		pointClamp.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+		pointClamp.anisotropyEnable = VK_FALSE;
+		pointClamp.addressU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+		pointClamp.addressV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+		pointClamp.addressW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+
+		mIndirectLighting = Texture::create(mDevice, frameGraph.getImage("indirect_lighting"), pointClamp);
+
+		destroySampleIrradianceDS();
+		createSampleIrradianceDS();
 	}
 
 	void DDGIPass::createPipelines(const DescriptorSetLayout::Ptr& frameSetLayout, const DescriptorSetLayout::Ptr& staticSetLayout) {

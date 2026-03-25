@@ -10,6 +10,10 @@ namespace flare::renderer {
 
     void DepthPrePass::createImages(const FrameGraph& frameGraph) {
 
+        auto [width, height] = frameGraph.getAttachmentSize("depth");
+        mWidth = width;
+        mHeight = height;
+
         SamplerDesc pointClamp{};
         pointClamp.minFilter = VK_FILTER_NEAREST;
         pointClamp.magFilter = VK_FILTER_NEAREST;
@@ -28,6 +32,13 @@ namespace flare::renderer {
         mDepthPreFb = Framebuffer::create(mDevice, mWidth, mHeight, true);
         mDepthPreFb->addColorAttachment(mDepthPreLinear->getImage());
         mDepthPreFb->addDepthAttachment(mDepthPre->getImage());
+    }
+
+    void DepthPrePass::resize(const FrameGraph& frameGraph) {
+        mDepthPreLinear.reset();
+        mDepthPre.reset();
+        mDepthPreFb.reset();
+        createImages(frameGraph);
     }
 
     void DepthPrePass::createPipeline(const FrameGraph& frameGraph, const GeometryBuffer::Ptr& geometryBuffer,

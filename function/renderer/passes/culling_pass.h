@@ -36,6 +36,7 @@ namespace flare::renderer {
 		void init(const DescriptorSetLayout::Ptr& staticSetLayout, const Texture::Ptr& hzbTex, int frameCount);
 		void render(const CommandBuffer::Ptr& cmd, const GeometryBuffer::Ptr& geoBuffer,
 							const DescriptorSet::Ptr& staticSet, Camera camera, int frameIndex);
+		void resize(const Texture::Ptr& hzbTex, int frameCount);
 		uint32_t getVisibleCount(int frameIndex) const;
 
 	public:
@@ -44,6 +45,7 @@ namespace flare::renderer {
 
 	private:
 		void createDescriptor(const Texture::Ptr& hzbTex, int frameCount);
+		void destroyDescriptors();
 		void createPipeline(const DescriptorSetLayout::Ptr& staticSetLayout);
 		void getFrustumCorners(glm::mat4 viewProj, glm::vec4* points);
 		void getFrustumPlanes(glm::mat4 viewProj, glm::vec4* planes);

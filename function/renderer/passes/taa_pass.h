@@ -28,10 +28,15 @@ namespace flare::renderer {
 			return (mCurrentHistoryIndex == 0) ? mHistory0 : mHistory1;
 		}
 
+		void resize(const CommandPool::Ptr& commandPool, const FrameGraph& frameGraph, const Texture::Ptr& depthTex,
+					const Texture::Ptr& lightingTex, const Texture::Ptr& motionVectorTex, int frameCount);
+
 	private:
 		void createImages(const CommandPool::Ptr& commandPool, const FrameGraph& frameGraph);
 		void createDescriptor(const Texture::Ptr& depthTex, const Texture::Ptr& lightingTex,
 							  const Texture::Ptr& motionVectorTex, int frameCount);
+		
+		void destroyDescriptors();
 		void createPipeline(const DescriptorSetLayout::Ptr& frameSetLayout);
 
 	private:

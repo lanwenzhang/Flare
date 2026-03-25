@@ -29,10 +29,12 @@ namespace flare::renderer {
 		void render(const CommandBuffer::Ptr& cmd, const GeometryBuffer::Ptr& geoBuffer,
 					const DescriptorSet::Ptr& frameSet, const DescriptorSet::Ptr& staticSet,
 					Camera camera, int frameIndex);
+		void resize(const FrameGraph& frameGraph);
 		[[nodiscard]] auto getDepthPreLinear() {return mDepthPreLinear;}
 
 	private:
 		void createImages(const FrameGraph& frameGraph);
+
 		void createPipeline(const FrameGraph& frameGraph, const GeometryBuffer::Ptr& geometryBuffer,
 			                const DescriptorSetLayout::Ptr& frameSetLayout, const DescriptorSetLayout::Ptr& staticSetLayout);
 	private:

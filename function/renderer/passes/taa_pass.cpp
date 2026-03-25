@@ -14,6 +14,10 @@ namespace flare::renderer {
 
     void TAAPass::createImages(const CommandPool::Ptr& commandPool, const FrameGraph& frameGraph) {
         
+        auto [width, height] = frameGraph.getAttachmentSize("lighting");
+        mWidth = width;
+        mHeight = height;
+
         SamplerDesc pointClamp{};
         pointClamp.minFilter = VK_FILTER_NEAREST;
         pointClamp.magFilter = VK_FILTER_NEAREST;
@@ -125,6 +129,33 @@ namespace flare::renderer {
             mDescriptorSet->updateImage(vkSet, mHistoryReadParam->mBinding, mHistoryReadParam->mImageInfos[0]);
             mDescriptorSet->updateStorageImage(vkSet, mHistoryWriteParam->mBinding, mHistoryWriteParam->mImageInfos[0]);
         }
+    }
+
+    void TAAPass::destroyDescriptors() {
+        mDescriptorSet.reset();
+        mDescriptorPool.reset();
+        mDescriptorSetLayout.reset();
+
+        mDepthParam.reset();
+        mMotionVectorParam.reset();
+        mCurrentColorParam.reset();
+        mHistoryReadParam.reset();
+        mHistoryWriteParam.reset();
+    }
+
+    void TAAPass::resize(const CommandPool::Ptr& commandPool,
+        const FrameGraph& frameGraph,
+        const Texture::Ptr& depthTex,
+        const Texture::Ptr& lightingTex,
+        const Texture::Ptr& motionVectorTex,
+        int frameCount) {
+        createImages(commandPool, frameGraph);
+
+        destroyDescriptors();
+        createDescriptor(depthTex, lightingTex, motionVectorTex, frameCount);
+
+        mPreviousHistoryIndex = 0;
+        mCurrentHistoryIndex = 0;
     }
 
     void TAAPass::createPipeline(const DescriptorSetLayout::Ptr& frameSetLayout) {

@@ -31,6 +31,8 @@ namespace flare::renderer {
 		void render(const CommandBuffer::Ptr& cmd, const GeometryBuffer::Ptr& geoBuffer,
 					const DescriptorSet::Ptr& frameSet, const DescriptorSet::Ptr& staticSet,
 					Camera camera, DirectionalLight light, int frameIndex);
+		void resize(const CommandPool::Ptr& commandPool, const FrameGraph& frameGraph);
+
 	public:
 		[[nodiscard]] auto getGbufferColor() { return mGColor; };
 		[[nodiscard]] auto getGbufferNormal() { return mGNormal; };

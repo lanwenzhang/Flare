@@ -20,10 +20,13 @@ namespace flare::renderer {
 		~MotionVectorPass() = default;
 		void init(const Texture::Ptr& depthTex, const FrameGraph& frameGraph, const DescriptorSetLayout::Ptr& frameSetLayout, int frameCount);
 		void render(const CommandBuffer::Ptr& cmd, const DescriptorSet::Ptr& frameSet, int frameIndex);
+		void resize(const Texture::Ptr& depthTex, const FrameGraph& frameGraph, int frameCount);
 		[[nodiscard]] auto getMotionVectors() const { return mMotionVectors; }
+
 	private:
 		void createImages(const FrameGraph& frameGraph);
 		void createDescriptor(const Texture::Ptr& depthTex, int frameCount);
+		void destroyDescriptors();
 		void createPipeline(const DescriptorSetLayout::Ptr& frameSetLayout);
 
 	private:

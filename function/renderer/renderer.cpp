@@ -92,6 +92,65 @@ namespace flare::renderer {
 		mTLAS = mAccelerationStructure->buildTLASFromInstances(instances);
 	}
 
+	void Renderer::resize(const SwapChain::Ptr& swapChain, int frameInFlight) {
+		
+		mWidth = swapChain->getExtent().width;
+		mHeight = swapChain->getExtent().height;
+
+		mFrameGraph.resize(mWidth, mHeight);
+
+		if (mDepthPrePass) {
+			mDepthPrePass->resize(mFrameGraph);
+		}
+
+		if (mDepthPyramidPass) {
+			mDepthPyramidPass->resize(mFrameGraph, mDepthPrePass->getDepthPreLinear(), frameInFlight);
+		}
+
+		if (mCullingPass) {
+			mCullingPass->resize(mDepthPyramidPass->getHZB(), frameInFlight);
+		}
+
+		if (mGeometryPass) {
+			mGeometryPass->resize(mCommandPool, mFrameGraph);
+		}
+
+		if (mMotionVectorPass) {
+			mMotionVectorPass->resize(mGeometryPass->getGbufferDepth(), mFrameGraph, frameInFlight);
+		}
+
+		if (mRayTracedShadowPass) {
+			mRayTracedShadowPass->resize(mCommandPool, mFrameGraph, mGeometryPass, mMotionVectorPass);
+		}
+
+		if (mDDGIPass) {
+			mDDGIPass->resize(mFrameGraph, mGeometryPass);
+		}
+
+		if (mGTAOPass) {
+			mGTAOPass->resize(mCommandPool, mGeometryPass);
+		}
+
+		if (mLightingPass) {
+			mLightingPass->resize(mCommandPool, mFrameGraph, mGeometryPass, mDDGIPass,
+				mRayTracedShadowPass->getVisibility(),
+				mDDGIPass->getIndirectLightingTex(),
+				mGTAOPass);
+		}
+
+		if (mTAAPass) {
+			mTAAPass->resize(mCommandPool, mFrameGraph,
+				mGeometryPass->getGbufferDepth(),
+				mLightingPass->getLightingTex(),
+				mMotionVectorPass->getMotionVectors(),
+				frameInFlight);
+		}
+
+		if (mToneMappingPass) {
+			mToneMappingPass->resize(swapChain, mLightingPass->getLightingTex());
+		}
+	}
+
 	void Renderer::createDescriptorSets(int frameInFlight){
 		// per frame
 		mFrameUniformManager = flare::renderer::FrameUniformManager::create();

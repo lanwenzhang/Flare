@@ -67,6 +67,7 @@ namespace flare::renderer {
 		void createDescriptorSets(int frameInFlight);
 		void createPasses(const SwapChain::Ptr& swapChain, int frameInFlight);
 		void createFrameGraph();
+		void resize(const SwapChain::Ptr& swapChain, int frameInFlight);
 
 		// cmd
 		void renderScene(const SwapChain::Ptr& swapChain, const CommandBuffer::Ptr& cmd, uint32_t imageIndex, int frameCount, int frameIndex, Camera camera, DirectionalLight light);

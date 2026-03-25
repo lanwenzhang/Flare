@@ -23,6 +23,9 @@ namespace flare::renderer {
     }
 
     void RayTracedShadowPass::createImages(const CommandPool::Ptr& commandPool, const FrameGraph& frameGraph) {
+        auto [width, height] = frameGraph.getAttachmentSize("visibility");
+        mWidth = width;
+        mHeight = height;
         // 1 rt
         SamplerDesc blueNoiseSampler{};
         blueNoiseSampler.minFilter = VK_FILTER_NEAREST;
@@ -353,6 +356,62 @@ namespace flare::renderer {
             }
         }
 
+    }
+
+    void RayTracedShadowPass::destroyDescriptors() {
+
+        mDescriptorSet.reset();
+        mDescriptorPool.reset();
+        mDescriptorSetLayout.reset();
+
+        mTemporalDescriptorSet.reset();
+        mTemporalDescriptorPool.reset();
+        mTemporalSetLayout.reset();
+
+        mAtrousDescriptorSets.clear();
+        mAtrousDescriptorPool.reset();
+        mAtrousSetLayout.reset();
+
+        mNormalParam.reset();
+        mDepthParam.reset();
+        mVisibilityParam.reset();
+        mBlueNoiseSobolParam.reset();
+        mBlueNoiseScramblingParam.reset();
+
+        mPrevNormalTemporalParam.reset();
+        mPrevDepthTemporalParam.reset();
+        mCurrNormalTemporalParam.reset();
+        mCurrDepthTemporalParam.reset();
+        mMotionTemporalParam.reset();
+        mHistoryVisibilityParam.reset();
+        mVisibilityTemporalParam.reset();
+        mMomentReadParam.reset();
+        mMomentWriteParam.reset();
+        mVarianceParam.reset();
+
+        mAtrousNormalParam.reset();
+        mAtrousDepthParam.reset();
+        mAtrousInputParam.reset();
+        mAtrousOutputParam.reset();
+    }
+
+    void RayTracedShadowPass::resize(const CommandPool::Ptr& commandPool, const FrameGraph& frameGraph, const GeometryPass::Ptr& geometryPass,
+                                     const MotionVectorPass::Ptr& motionVectorPass) {
+
+        mPrevNormal = geometryPass->getPrevGbufferNormal();
+        mPrevDepth = geometryPass->getPrevGbufferDepth();
+        mNormal = geometryPass->getGbufferNormal();
+        mDepth = geometryPass->getGbufferDepth();
+        mMotionVector = motionVectorPass->getMotionVectors();
+
+        createImages(commandPool, frameGraph);
+        destroyDescriptors();
+        createShadowDS();
+        createTemporalFilterDS();
+        createAtrousDS();
+
+        mVarianceInitialized = false;
+        mCurrentMomentsIndex = 0;
     }
 
     void RayTracedShadowPass::createPipeline(const DescriptorSetLayout::Ptr& frameSetLayout, const DescriptorSetLayout::Ptr& staticSetLayout) {

@@ -50,6 +50,7 @@ namespace flare::renderer {
 		void init(Device::Ptr device, CommandPool::Ptr commandPool) { mDevice = device; mCommandPool = commandPool; }
 		bool loadFromJsonFile(const std::string& path);
 		void createImages();
+		void resize(uint32_t width, uint32_t height);
 		bool setRecord(const std::string& passName, std::function<void()> record);
 		bool compile();
 		void execute();

@@ -27,7 +27,10 @@ namespace flare::renderer {
 	}
 
 	void LightingPass::createImages(const CommandPool::Ptr& commandPool, const FrameGraph& frameGraph, const GeometryPass::Ptr& geometryPass){
-		
+		auto [width, height] = frameGraph.getAttachmentSize("lighting");
+		mWidth = width;
+		mHeight = height;
+
 		SamplerDesc pointClamp{};
 		pointClamp.minFilter = VK_FILTER_NEAREST;
 		pointClamp.magFilter = VK_FILTER_NEAREST;
@@ -183,6 +186,42 @@ namespace flare::renderer {
 				mSphereDescriptorSet->updateImage(mSphereDescriptorSet->getDescriptorSet(i), p->mBinding, p->mImageInfos[0]);
 			}
 		}
+	}
+
+	void LightingPass::destroyDescriptorSet() {
+		mParams.clear();
+		mDescriptorSet.reset();
+		mDescriptorPool.reset();
+		mDescriptorSetLayout.reset();
+	}
+
+	void LightingPass::destroySphereDS() {
+		mSphereParams.clear();
+		mSphereDescriptorSet.reset();
+		mSphereDescriptorPool.reset();
+		mSphereDescriptorSetLayout.reset();
+	}
+
+	void LightingPass::resize(const CommandPool::Ptr& commandPool, const FrameGraph& frameGraph,
+						      const GeometryPass::Ptr& geometryPass,const DDGIPass::Ptr& ddgiPass,
+							  const Texture::Ptr& visibilityTex, const Texture::Ptr& indirectTex, const GTAOPass::Ptr& gtaoPass) {
+		mColor = geometryPass->getGbufferColor();
+		mNormal = geometryPass->getGbufferNormal();
+		mDepth = geometryPass->getGbufferDepth();
+		mMR = geometryPass->getGbufferMR();
+
+		mVisibility = visibilityTex;
+		mIndirect = indirectTex;
+		mAORaw = gtaoPass->getAO();
+
+		mProbeIrradiance = ddgiPass->getProbeIrradiance();
+		mProbeOffset = ddgiPass->getPrevOffset();
+
+		createImages(commandPool, frameGraph, geometryPass);
+		destroyDescriptorSet();
+		createDescriptorSet();
+		destroySphereDS();
+		createSphereDS();
 	}
 
 	void LightingPass::createPipeline(const FrameGraph& frameGraph, const DescriptorSetLayout::Ptr& frameSetLayout, 
