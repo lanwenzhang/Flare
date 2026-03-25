@@ -47,13 +47,15 @@ A real-time hybrid renderer featuring GPU culling, deferred shading, PBR, DDGI, 
 
 ## Building
 ### Windows 
+1. Clone the repository.
 ```
 git clone --recursive https://github.com/lanwenzhang/Flare.git
-cd Flare
-mkdir build
-cd build
-cmake -G "Visual Studio 17 2022" ..
 ```
+2. Open Visual Studio 2022.
+3. Go to **File > Open > Folder...** and open the project root folder (`Flare`), which contains `CMakeLists.txt`.
+4. Wait for Visual Studio to finish configuring the CMake project.
+5. Select a build configuration as **x64-Debug** and **Build**.
+6. Set the main executable target as the **Startup Item** and press **F5** to run.
 
 ## Usage
 * `W`/`A`/`S`/`D` - camera movement
