@@ -52,10 +52,10 @@ A real-time hybrid renderer featuring GPU culling, deferred shading, PBR, DDGI, 
 git clone --recursive https://github.com/lanwenzhang/Flare.git
 ```
 2. Open Visual Studio 2022.
-3. Go to **File > Open > Folder...** and open the project root folder (`Flare`), which contains `CMakeLists.txt`.
+3. Go to **File > Open > Folder...** and open the project root folder `Flare`, which contains `CMakeLists.txt`.
 4. Wait for Visual Studio to finish configuring the CMake project.
-5. Select a build configuration as **x64-Debug** and **Build**.
-6. Set the main executable target as the **Startup Item** and press **F5** to run.
+5. Select a build configuration as `x64-Debug` and `Build`.
+6. Set the main executable target as the `Startup Item` and press `F5` to run.
 
 ## Usage
 * `W`/`A`/`S`/`D` - camera movement
